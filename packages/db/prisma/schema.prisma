@@ -11,17 +11,33 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url =  env{"DATABASE_URL"}
+  
 }
 
 model User{
-  id        
+  id               String           @id @default(uuid())
+  email            String
+  password         String
+  name             String
+  photo            String
+  rooms            Room[]
+  chats            Chat[]
 
 }
-model room{
-
+model Room{
+  id               Int               @id @default(autoincrement())
+  slug             String            @unique
+  createdAt        DateTime          @default(now())
+  adminId          String  
+  admin            User              @relation(fields: [adminId],references: [id] )
+  chats            Chat[]     
 }
 
-model chat{
-
+model Chat{
+  id               Int              @id @default(autoincrement())
+  roomId           Int  
+  message          String
+  usedId           String
+  room             Room            @relation(fields: [roomId], references: [id])  
+  user             User             @relation(fields: [usedId],references: [id])
 }
