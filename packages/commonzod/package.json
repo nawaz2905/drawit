@@ -1,9 +1,8 @@
 {
   "name": "@repo/commonzod",
   "version": "1.0.0",
-  "exports":{
-    "./types": "./src/types"
-
+  "exports": {
+    "./types": "./src/types.ts"
   },
   "description": "",
   "main": "index.js",
