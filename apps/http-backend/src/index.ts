@@ -3,9 +3,10 @@ console.log("DB URL =>", process.env.DATABASE_URL);
 import jwt from 'jsonwebtoken';
 import bcrypt from "bcrypt";
 import { JWT_PASSCODE } from '@repo/backend-common/config';
-import { SignupZodSchema, SigninZodSchema } from '@repo/commonzod/types';
+import { SignupZodSchema, SigninZodSchema, CreateRoomSchema } from '@repo/commonzod/types';
 import { prisma } from '@repo/db/client';
 import express from 'express';
+import { middleware } from "./middleware";
 
 const app = express();
 app.use(express.json());
@@ -43,16 +44,12 @@ app.post("/api/v1/signup", async (req, res) => {
             message: "signed up successfully!"
         });
 
-
     } catch (e) {
         console.error("Signup Error:", e);
         return res.status(500).json({
             message: "Server Error"
         });
     }
-
-
-
 });
 
 app.post("/api/v1/signin", async (req, res) => {
@@ -103,10 +100,59 @@ app.post("/api/v1/signin", async (req, res) => {
     }
 });
 
-app.post("/api/v1/room", async (req, res) => {
-    // To be implemented
-    res.status(501).json({ message: "Not implemented yet" });
+app.post("/api/v1/room",middleware, async (req, res) => {
+    
+    const parsedData = CreateRoomSchema.safeParse(req.body);
+    if(!parsedData.success){
+        res.json({
+            message:"Incorrect inputs"
+        })
+        return;
+    }
+    //@ts-ignore
+    const userId = req.userId;
+    try{
+        const room = await prisma.room.create({
+            data:{
+                slug:parsedData.data.name,
+                adminId: userId
+            }
+        });
+        res.json({
+            roomId: room.adminId
+        });
+
+    }catch(e){
+        res.status(501).json({
+            message:"Not implemented yet"
+        });
+    }
 });
+
+app.get("/api/v1/chats/:roomId", async (req, res)=>{
+    try{
+        const roomId = Number(req.params.roomId);
+        console.log(req.params.roomId);
+        const message = await prisma.chat.findMany({
+            where:{
+                roomId: roomId
+            },
+            orderBy:{
+                id:"desc"
+            },
+            take: 1000
+        });
+        res.json({
+            message
+        })
+
+    }catch(e){
+        console.log(e);
+        res.json({
+            messages: []
+        })
+    }
+})
 
 app.listen(3001, () => {
     console.log("Server is running on port 3001");
