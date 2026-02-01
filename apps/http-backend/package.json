@@ -9,8 +9,8 @@
     "dev": "ts-node-dev --respawn src/index.ts"
   },
   "dependencies": {
-    
     "bcrypt": "^6.0.0",
+    "cors": "^2.8.6",
     "express": "^5.2.1",
     "jsonwebtoken": "^9.0.3"
   },
@@ -19,11 +19,12 @@
   "license": "ISC",
   "type": "commonjs",
   "devDependencies": {
-    "@repo/db":"workspace:*",
     "@repo/backend-common": "workspace:*",
     "@repo/commonzod": "workspace:*",
+    "@repo/db": "workspace:*",
     "@repo/typescript-config": "workspace:*",
     "@types/bcrypt": "^5.0.2",
+    "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/jsonwebtoken": "^9.0.10",
     "ts-node-dev": "^2.0.0"

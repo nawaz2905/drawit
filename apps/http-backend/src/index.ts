@@ -7,9 +7,11 @@ import { SignupZodSchema, SigninZodSchema, CreateRoomSchema } from '@repo/common
 import { prisma } from '@repo/db/client';
 import express from 'express';
 import { middleware } from "./middleware";
+import cors from 'cors';
 
 const app = express();
 app.use(express.json());
+app.use(cors())
 
 app.post("/api/v1/signup", async (req, res) => {
     try {
@@ -33,14 +35,16 @@ app.post("/api/v1/signup", async (req, res) => {
 
         const hashedPassword = await bcrypt.hash(password, 10);
 
-        await prisma.user.create({
+        const user = await prisma.user.create({
             data: {
                 email: username,
                 password: hashedPassword,
                 name: name
             }
         });
+        
         return res.status(201).json({
+            userId: user.id,
             message: "signed up successfully!"
         });
 
@@ -109,8 +113,8 @@ app.post("/api/v1/room",middleware, async (req, res) => {
         })
         return;
     }
-    //@ts-ignore
-    const userId = req.userId;
+    
+    const userId = (req as any).userId;
     try{
         const room = await prisma.room.create({
             data:{
@@ -119,7 +123,7 @@ app.post("/api/v1/room",middleware, async (req, res) => {
             }
         });
         res.json({
-            roomId: room.adminId
+            roomId: room.id
         });
 
     }catch(e){
