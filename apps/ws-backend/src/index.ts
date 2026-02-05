@@ -1,4 +1,4 @@
-import { WebSocketServer } from 'ws';
+import { WebSocketServer, WebSocket } from 'ws';
 import { JWT_PASSCODE } from "@repo/backend-common/config";
 import jwt from 'jsonwebtoken'
 import {prisma} from '@repo/db/client'
@@ -30,7 +30,7 @@ function checkUser(token: string): string | null{
 
 }
 
-wss.on('connenction', function connection(ws, request) {
+wss.on('connection', function connection(ws, request) {
     const url = request.url;
     if (!url) {
         return;
@@ -61,7 +61,11 @@ wss.on('connenction', function connection(ws, request) {
             user?.rooms.push(parsedData.roomId);
         }
         if(parsedData.type === "leave_room"){
-            const user = users.find(x => x === parsedData.room);
+            const user = users.find(x => x.ws === ws);
+            if(!user){
+                return;
+            }
+            user.rooms = user?.rooms.filter(x => x === parsedData.room);
         }
         console.log("message received")
         console.log(parsedData);
