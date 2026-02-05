@@ -49,7 +49,7 @@ wss.on('connection', function connection(ws, request) {
         ws
     });
 
-    ws.on('message', async function message(data:any) {
+    ws.on('message', async function message(data) {
         let parsedData;
         if(typeof data !== "string"){
             parsedData = JSON.parse(data.toString());
