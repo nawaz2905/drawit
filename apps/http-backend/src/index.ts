@@ -1,5 +1,5 @@
 import "dotenv/config";
-console.log("DB URL =>", process.env.DATABASE_URL);
+// console.log("DB URL =>", process.env.DATABASE_URL);
 import jwt from 'jsonwebtoken';
 import bcrypt from "bcrypt";
 import { JWT_PASSCODE } from '@repo/backend-common/config';
@@ -156,6 +156,19 @@ app.get("/api/v1/chats/:roomId", async (req, res)=>{
             messages: []
         })
     }
+});
+
+app.get("/api/v1/room/:slug", async (req, res) =>{
+    const slug = req.params.slug;
+    const room = await prisma.room.findFirst({
+        where:{
+            slug
+        }
+    });
+    res.json({
+        room
+    });
+
 })
 
 app.listen(3001, () => {
