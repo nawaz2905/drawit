@@ -13,8 +13,11 @@ interface User{
 const users: User[]=[];
 
 function checkUser(token: string): string | null{
+    if(!token){
+        console.log("No token provided");
+        return null;
+    }
     try{
-
         const decoded = jwt.verify(token, JWT_PASSCODE);
         if(typeof decoded == "string"){
             return null;
@@ -24,10 +27,9 @@ function checkUser(token: string): string | null{
         }
         return decoded.userId;
     }catch(e){
+        console.log("jwt verification failed:", e);
         return null;
     }
-    return null;
-
 }
 
 wss.on('connection', function connection(ws, request) {
@@ -71,26 +73,60 @@ wss.on('connection', function connection(ws, request) {
         console.log(parsedData);
 
         if(parsedData.type === "chat"){
-            const roomId = parsedData.roomId;
-            const message = parsedData.message;
-        
+            try{
+                const roomId = parsedData.roomId;
+                const message = parsedData.message;
+                if(message.type === "pencil"){
+                    if(!message.BufferStroke || message.BufferStroke.length === 0){
+                        console.error("Invalid pencil message: BufferStroke is empty/missing");
+                        return;
+                    }
+                    message.endX = message.BufferStroke[message.BufferStroke.length -1][0];
+                    message.endY = message.BufferStroke[message.BufferStroke.length -1][1];
+                }
+                console.log("before double stringify", message)
+                const themessage = JSON.stringify(JSON.stringify(message));
+                console.log("After double stringify", message)
 
-            await prisma.chat.create({
-                data:{
-                    roomId: Number(roomId),
-                    message,
-                    userId
+                const parsedMessage = JSON.parse(JSON.parse(message));
+                console.log("after the parsed message", message)
+                if(parsedMessage.type === "pencil"){
+                    await prisma.chat.create({
+                        data:{
+                            roomId:roomId,
+                            type:parsedMessage.type,
+                            startX:parsedMessage.startX,
+                            startY: parsedMessage.startY,
+                            endX: parsedMessage.endX,
+                            endY: parsedMessage.endY,
+                            message: themessage,
+                            userId: userId
+                        },
+                    });
+                }else{
+                    await prisma.chat.create({
+                        data:{
+                            roomId: roomId,
+                            message: themessage,
+                            userId:userId,
+                        },
+                    });
+                    users.forEach((user)=>{
+                        if(user.rooms.includes(roomId)){
+                            user.ws.send(
+                                JSON.stringify({
+                                    type:"chat",
+                                    message: message,
+                                    roomId,
+                                })
+                            )
+                        }
+                    })
                 }
-            });
-            users.forEach(user =>{
-                if(user.rooms.includes(roomId)){
-                    user.ws.send(JSON.stringify({
-                        type:"chat",
-                        message:message,
-                        roomId
-                    }))
-                }
-            })
+
+            } catch(e){
+                console.log("error in sending to users or something, error is "+ e);
+            }
         }
     });
 

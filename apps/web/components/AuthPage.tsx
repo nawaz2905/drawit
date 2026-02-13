@@ -1,0 +1,115 @@
+"use client";
+
+import { useState } from "react";
+import axios from "axios";
+import { useRouter } from "next/navigation";
+
+export function AuthPage({isSignin}:{isSignin: boolean}){
+    const [email, setEmail]= useState("");
+    const [password, setPassword] = useState("");
+    const [name, setName]= useState("");
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState("");
+    const router = useRouter();
+
+    const handleSubmit = async(e:React.FormEvent ) => {
+        e.preventDefault();
+        setLoading(true);
+        setError("");
+
+        try{
+            if(isSignin){
+                const response = await axios.post("http://localhost:3001/signin",{
+                    email,
+                    password,
+                });
+                if(!response){
+                    setError("Something went wrong");
+                    return;
+                }
+                localStorage.setItem("token", response.data.token);
+                router.push("/room");
+            }else {
+                const response = await axios.post("http://localhost:3001/signup",{
+                    email,
+                    password,
+                    name,
+                });
+                const signinResponse = await axios.post(
+                    "http://localhost:3001/signin",{
+                        email,
+                        password,
+                    },
+                );
+                localStorage.setItem("token", signinResponse.data.token);
+                router.push("/signin");
+            }
+        }catch(e:any){
+            setError(e.response?.data?.message || "Something went wrong");
+        }finally{
+            setLoading(false);
+        }
+    }
+    return (
+        <div className="flex w-screen h-screen justify-center items-center bg-black" > 
+        <div className="p-8 bg-zinc-900 rounded-xl shadow-2xl w-full max-w-md border border-zinc-800 "  >
+            <h1 className="text-2xl font-bold text-white text-center mb-6">
+                {isSignin ? "Sign In" : "Sign Up"}
+            </h1>
+            <form onSubmit={handleSubmit} className="space-y-4">
+                {!isSignin &&(
+                    <div>
+                        <input 
+                        type="text"
+                        placeholder="Name"
+                        value={name}
+                        onChange={(e)=> setName(e.target.value)}
+                        className="w-full px-4 py-3 bg-zinc-800 text-white rounded-lg border border-zinc-700 focus:border-blue-500 focus:outline-none"
+                        required
+                        />
+                    </div>
+                )}
+                <div>z
+                    <input 
+                        type="email"
+                        placeholder="Email"
+                        value={email}
+                        onChange={(e)=> setEmail(e.target.value)}
+                        className="w-full px-4 py-3 bg-zinc-800 text-white rounded-lg border border-zinc-700 focus:border-blue-500 focus:outline-none"
+                        required
+                        />
+                </div>
+                <div>
+                    <input 
+                        type="password"
+                        placeholder="Password"
+                        value={password}
+                        onChange={(e)=> setPassword(e.target.value)}
+                        className="w-full px-4 py-3 bg-zinc-800 text-white rounded-lg border border-zinc-700 focus:border-blue-500 focus:outline-none"
+                        required
+                        />
+                </div>
+                {error && (
+                    <div className="text-red-400 text-sm text-center" >{error}</div>
+                )}
+                <button
+                        type="submit"
+                        disabled={loading}
+                        className="w-full py-3 bg-black hover:bg-zinc-800 text-white font-semibold rounded-lgborder-zinc-700 transition-colors disabled:opacity-50"
+                    >{loading ? "Loading..." : isSignin ? "Sign In" : "Sign Up"}
+                </button>
+            </form>
+            <p className="text-zinc-400 text-center mt-6">
+                {isSignin ? "Don't have an account?" : "Already have an account?"}
+                <a 
+                    href={isSignin ? "/signup" : "/signin"}
+                    className="text-white hover:text-zinc-300 hover:underline font-me"
+                 >
+                    {isSignin ? "Sign Up": "Sign In"} 
+                </a>
+            </p>
+        </div>
+
+        </div>
+    )
+}

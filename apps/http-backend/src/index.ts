@@ -158,18 +158,215 @@ app.get("/api/v1/chats/:roomId", async (req, res)=>{
     }
 });
 
-app.get("/api/v1/room/:slug", async (req, res) =>{
+app.get("/api/v1/chats/:slug", async (req, res) =>{
     const slug = req.params.slug;
     const room = await prisma.room.findFirst({
         where:{
-            slug
+            slug: slug
+        },
+        include:{
+            chats: true,
         }
     });
+    const roomArray = room?.chats ?? [];
+
+    const messages = [];
+    for(const chat of roomArray){
+        try{
+            if(typeof chat.message === "string"){
+            } else{
+                //@ts-ignore
+                messages.push(...chat.message);
+            }
+        } catch (e){
+            res.json({
+                message:"some issue"
+            });
+        }
+    }
     res.json({
-        room
+        messages,
     });
+});
+
+app.post("/api/v1/savemessage", (req,res)=>{
+    const chat = req.body.chat;
+    const slug = req.body.slug;
+
+    const room = prisma.room.findFirst({
+        where:{
+            slug: slug,
+        },
+    });
+})
+//@ts-ignore
+app.post("/api/v1/deletechat/:slug", async (req, res)=>{
+    try{
+        const slug = req.params.slug;
+        const type = req.body.type;
+        const startX = req.body.startX;
+        const startY = req.body.startY;
+        const endX = req.body.endX;
+        const endY = req.body.endY;
+
+        const roomResponse = await prisma.room.findFirst({
+            where:{
+                slug:slug
+            }
+        });
+        const roomId = roomResponse?.id;
+
+        if (!roomId){
+            return res.status(400).json({
+                message: "Room not found"
+            });
+        }
+        const shape = await prisma.chat.findFirst({
+            where:{
+                roomId: roomId,
+                type: type,
+                startX: startX,
+                startY: startY,
+                endX:endX,
+                endY:endY
+            }
+        });
+        if(!shape){
+            return res.status(404).json({
+                message:"Shape not Found"
+            });
+        }
+        const response = await prisma.chat.delete({
+            where:{
+                roomId: roomId,
+                id:shape.id
+            }
+        });
+        if(response){
+            res.json({
+                "message" :"Deletion successfull"
+            });
+        } else {
+            res.json({
+                "message" : "Deletion unsuccessfull"
+            })
+        }
+                    
+    } catch (e){
+        res.status(500).json({
+            message: "Error deleting shape",
+            error: e
+        })
+    }
 
 })
+
+app.post("/api/v1/deleteshape/:roomId", async(req, res)=>{
+    try{
+        const roomId = Number(req.params.roomId);
+        const {type, startX, startY, endY, endX } = req.body;
+
+        const room = await prisma.room.findFirst({
+            where:{
+                id: roomId
+            }
+        });
+        if(!room){
+            return res.status(404).json({
+                message:"Room not Found!"
+            });
+        }
+        const chat = await prisma.chat.findFirst({
+            where:{
+                roomId: roomId,
+                type: type,
+                startX:startX,
+                startY:startY,
+                endX:endX,
+                endY:endY
+            }
+        });
+        if(!chat){
+            return res.status(404).json({
+                message:"Shape not Found"
+            });
+        }
+        await prisma.chat.delete({
+            where:{
+                id:chat.id
+            }
+        });
+        res.json({
+            message:"Deletion Successfull"
+        });
+
+    } catch(e){
+        res.status(500).json({
+            message:"Deletion unsuccessfull",
+            error: e
+        });
+    }
+});
+
+app.get("/api/v1/room/slug/:slug", async(req, res)=>{
+    const slug = req.params.slug;
+    try{
+        const room = await prisma.room.findFirst({
+            where:{
+                slug: slug
+            },
+        });
+        if(!room){
+            return res.status(404).json({
+                error:"Room not Found"
+            });
+        }
+        res.json({
+            id:room?.id,
+        });
+    }catch(e){
+        res.status(500).json({
+            error:"database error"
+        });
+    }
+
+})
+
+app.get("/api/v1/room/id/:roomId", async(req, res)=>{
+    const roomId = Number(req.params.roomId);
+    const room = await prisma.room.findFirst({
+        where:{
+            id: roomId
+        }
+    });
+    const slug = room?.slug;
+    res.json({
+        slug: slug
+    })
+});
+
+
+app.post("/api/v1/createroom/:slug", async(req, res)=>{
+    const slug = req.params.slug;
+    try{
+        const room = await prisma.room.create({
+            data:{
+                adminId: req.body.adminId,
+                slug: slug,
+            },
+        });
+        res.json({
+            roomId: room.id,
+        })
+    }catch(e){
+        res.json({
+            error: e as Error,
+            //@ts-ignore
+            message:`Issue in creating:${e.message}`,
+        })
+    }
+})
+
 
 app.listen(3001, () => {
     console.log("Server is running on port 3001");
