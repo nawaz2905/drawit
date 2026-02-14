@@ -1,32 +1,32 @@
 import { WebSocketServer, WebSocket } from 'ws';
 import { JWT_PASSCODE } from "@repo/backend-common/config";
 import jwt from 'jsonwebtoken'
-import {prisma} from '@repo/db/client'
+import { prisma } from '@repo/db/client'
 
 
 const wss = new WebSocketServer({ port: 8080 });
-interface User{
-    ws:WebSocket,
-    rooms:string[],
-    userId:string
+interface User {
+    ws: WebSocket,
+    rooms: string[],
+    userId: string
 }
-const users: User[]=[];
+const users: User[] = [];
 
-function checkUser(token: string): string | null{
-    if(!token){
+function checkUser(token: string): string | null {
+    if (!token) {
         console.log("No token provided");
         return null;
     }
-    try{
+    try {
         const decoded = jwt.verify(token, JWT_PASSCODE);
-        if(typeof decoded == "string"){
+        if (typeof decoded == "string") {
             return null;
         }
-        if(!decoded || !decoded.userId){
+        if (!decoded || !decoded.userId) {
             return null;
         }
         return decoded.userId;
-    }catch(e){
+    } catch (e) {
         console.log("jwt verification failed:", e);
         return null;
     }
@@ -39,7 +39,7 @@ wss.on('connection', function connection(ws, request) {
     }
     const queryParams = new URLSearchParams(url.split('?')[1]);
     const token = queryParams.get('token') || "";
-    const userId = checkUser(token); 
+    const userId = checkUser(token);
 
     if (userId == null) {
         ws.close();
@@ -47,85 +47,85 @@ wss.on('connection', function connection(ws, request) {
     }
     users.push({
         userId,
-        rooms:[],
+        rooms: [],
         ws
     });
 
     ws.on('message', async function message(data) {
         let parsedData;
-        if(typeof data !== "string"){
+        if (typeof data !== "string") {
             parsedData = JSON.parse(data.toString());
-        }else{
+        } else {
             parsedData = JSON.parse(data); //{type: "join-room", roomId:1}
         }
-        if(parsedData.type === "join_room"){
+        if (parsedData.type === "join_room") {
             const user = users.find(x => x.ws === ws);
             user?.rooms.push(parsedData.roomId);
         }
-        if(parsedData.type === "leave_room"){
+        if (parsedData.type === "leave_room") {
             const user = users.find(x => x.ws === ws);
-            if(!user){
+            if (!user) {
                 return;
             }
-            user.rooms = user?.rooms.filter(x => x === parsedData.room);
+            user.rooms = user?.rooms.filter(x => x !== parsedData.room);
         }
         console.log("message received")
         console.log(parsedData);
 
-        if(parsedData.type === "chat"){
-            try{
+        if (parsedData.type === "chat") {
+            try {
                 const roomId = parsedData.roomId;
-                const message = parsedData.message;
-                if(message.type === "pencil"){
-                    if(!message.BufferStroke || message.BufferStroke.length === 0){
+                const messageString = parsedData.message;
+                const message = typeof messageString === "string" ? JSON.parse(messageString) : messageString;
+
+                if (message.type === "pencil") {
+                    if (!message.BufferStroke || message.BufferStroke.length === 0) {
                         console.error("Invalid pencil message: BufferStroke is empty/missing");
                         return;
                     }
-                    message.endX = message.BufferStroke[message.BufferStroke.length -1][0];
-                    message.endY = message.BufferStroke[message.BufferStroke.length -1][1];
+                    message.endX = message.BufferStroke[message.BufferStroke.length - 1][0];
+                    message.endY = message.BufferStroke[message.BufferStroke.length - 1][1];
                 }
-                console.log("before double stringify", message)
-                const themessage = JSON.stringify(JSON.stringify(message));
-                console.log("After double stringify", message)
 
-                const parsedMessage = JSON.parse(JSON.parse(message));
-                console.log("after the parsed message", message)
-                if(parsedMessage.type === "pencil"){
+                const serializedMessage = JSON.stringify(message);
+
+                if (message.type === "pencil") {
                     await prisma.chat.create({
-                        data:{
-                            roomId:roomId,
-                            type:parsedMessage.type,
-                            startX:parsedMessage.startX,
-                            startY: parsedMessage.startY,
-                            endX: parsedMessage.endX,
-                            endY: parsedMessage.endY,
-                            message: themessage,
+                        data: {
+                            roomId: roomId,
+                            type: message.type,
+                            startX: message.startX,
+                            startY: message.startY,
+                            endX: message.endX,
+                            endY: message.endY,
+                            message: serializedMessage,
                             userId: userId
                         },
                     });
-                }else{
+                } else {
                     await prisma.chat.create({
-                        data:{
+                        data: {
                             roomId: roomId,
-                            message: themessage,
-                            userId:userId,
+                            message: serializedMessage,
+                            userId: userId,
                         },
                     });
-                    users.forEach((user)=>{
-                        if(user.rooms.includes(roomId)){
-                            user.ws.send(
-                                JSON.stringify({
-                                    type:"chat",
-                                    message: message,
-                                    roomId,
-                                })
-                            )
-                        }
-                    })
                 }
 
-            } catch(e){
-                console.log("error in sending to users or something, error is "+ e);
+                users.forEach((user) => {
+                    if (user.rooms.includes(roomId)) {
+                        user.ws.send(
+                            JSON.stringify({
+                                type: "chat",
+                                message: serializedMessage,
+                                roomId,
+                            })
+                        )
+                    }
+                })
+
+            } catch (e) {
+                console.log("error in sending to users or something, error is " + e);
             }
         }
     });
