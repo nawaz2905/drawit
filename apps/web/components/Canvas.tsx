@@ -1,6 +1,8 @@
-import {IconButton} from "./Icon";
-import { useGame } from "@/draw/newcalls";
+import {IconButton} from "./Icons";
+import { useGame } from "../draw/newcalls";
+import { Circle, Pencil, RectangleHorizontalIcon, Hand, Eraser } from "lucide-react";
 type Shape = "circle" | "rect" | "pencil" | "hand" | "eraser";
+
 
 let activated = "";
 
@@ -9,7 +11,7 @@ export function Canvas({
     socket
 
 }:{
-    roomId: Number;
+    roomId: number;
     socket: WebSocket;
 }) {
     const {canvasRef, selectedTool, setSelectedTool } = useGame(roomId, socket);
