@@ -1,3 +1,4 @@
+"use client";
 import {IconButton} from "./Icons";
 import { useGame } from "../draw/newcalls";
 import { Circle, Pencil, RectangleHorizontalIcon, Hand, Eraser } from "lucide-react";

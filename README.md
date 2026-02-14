@@ -1,140 +1,97 @@
-<<<<<<< HEAD
-# Turborepo starter
+# DrawIt
 
-This Turborepo starter is maintained by the Turborepo core team.
+DrawIt is a real-time collaborative drawing application inspired by Excalidraw. It allows multiple users to draw, sketch, and brainstorm together on a shared canvas with instant synchronization using WebSockets.
 
-## Using this example
+## 🚀 Features
 
-Run the following command:
+- **Real-time Collaboration**: Multiple users can draw on the same canvas simultaneously.
+- **Persistent Rooms**: Draw in private rooms with unique slugs.
+- **Rich Drawing Tools**: Pencil, rectangles, and more (extensible).
+- **Infinite Canvas**: Plenty of space for your ideas.
+- **Secure Authentication**: User signup and signin with JWT.
+
+## 🛠 Tech Stack
+
+- **Monorepo**: managed by [Turborepo](https://turbo.build/repo)
+- **Frontend**: [Next.js](https://nextjs.org/), [React](https://reactjs.org/), [Tailwind CSS](https://tailwindcss.com/)
+- **WebSocket Backend**: [ws](https://github.com/websockets/ws)
+- **HTTP Backend**: [Express](https://expressjs.com/), [Zod](https://zod.dev/)
+- **Database**: [PostgreSQL](https://www.postgresql.org/) with [Prisma](https://www.prisma.io/)
+- **Package Manager**: [pnpm](https://pnpm.io/)
+
+## 📂 Project Structure
+
+```text
+drawit/
+├── apps/
+│   ├── web/             # Next.js frontend
+│   ├── http-backend/    # REST API (Auth, Room management)
+│   └── ws-backend/      # WebSocket server (Real-time drawing)
+├── packages/
+│   ├── db/              # Prisma client and schema
+│   ├── commonzod/       # Shared Zod validation schemas
+│   ├── backend-common/  # Shared backend configuration/constants
+│   └── ui/              # Shared UI components
+└── ...
+```
+
+## 🚥 Getting Started
+
+### Prerequisites
+
+- Node.js >= 18
+- pnpm
+- PostgreSQL instance
+
+### Installation
+
+1. Clone the repository:
+   ```sh
+   git clone <repo-url>
+   cd drawit
+   ```
+
+2. Install dependencies:
+   ```sh
+   pnpm install
+   ```
+
+3. Set up environment variables:
+   Create a `.env` file in `packages/db` and `apps/http-backend`:
+   ```env
+   DATABASE_URL="postgresql://user:password@localhost:5432/drawit"
+   JWT_SECRET="your-secret-key"
+   ```
+
+4. Run migrations:
+   ```sh
+   cd packages/db
+   pnpm dlx prisma migrate dev
+   ```
+
+### Running the Project
+
+From the root directory, run:
 
 ```sh
-npx create-turbo@latest
+pnpm dev
 ```
 
-## What's inside?
+This will start:
+- Frontend: `http://localhost:3000`
+- HTTP Backend: `http://localhost:3001`
+- WebSocket Server: `ws://localhost:8080`
 
-This Turborepo includes the following packages/apps:
+## 📚 Documentation
 
-### Apps and Packages
+- [Architecture Overview](ARCHITECTURE.md)
+- [API Documentation](API_DOCUMENTATION.md)
+- [Database Schema](DATABASE_SCHEMA.md)
 
-- `docs`: a [Next.js](https://nextjs.org/) app
-- `web`: another [Next.js](https://nextjs.org/) app
-- `@repo/ui`: a stub React component library shared by both `web` and `docs` applications
-- `@repo/eslint-config`: `eslint` configurations (includes `eslint-config-next` and `eslint-config-prettier`)
-- `@repo/typescript-config`: `tsconfig.json`s used throughout the monorepo
+## 🤝 Contributing
 
-Each package/app is 100% [TypeScript](https://www.typescriptlang.org/).
+Contributions are welcome! Please feel free to submit a Pull Request.
 
-### Utilities
+## 📄 License
 
-This Turborepo has some additional tools already setup for you:
-
-- [TypeScript](https://www.typescriptlang.org/) for static type checking
-- [ESLint](https://eslint.org/) for code linting
-- [Prettier](https://prettier.io) for code formatting
-
-### Build
-
-To build all apps and packages, run the following command:
-
-```
-cd my-turborepo
-
-# With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended)
-turbo build
-
-# Without [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation), use your package manager
-npx turbo build
-yarn dlx turbo build
-pnpm exec turbo build
-```
-
-You can build a specific package by using a [filter](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters):
-
-```
-# With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended)
-turbo build --filter=docs
-
-# Without [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation), use your package manager
-npx turbo build --filter=docs
-yarn exec turbo build --filter=docs
-pnpm exec turbo build --filter=docs
-```
-
-### Develop
-
-To develop all apps and packages, run the following command:
-
-```
-cd my-turborepo
-
-# With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended)
-turbo dev
-
-# Without [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation), use your package manager
-npx turbo dev
-yarn exec turbo dev
-pnpm exec turbo dev
-```
-
-You can develop a specific package by using a [filter](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters):
-
-```
-# With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended)
-turbo dev --filter=web
-
-# Without [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation), use your package manager
-npx turbo dev --filter=web
-yarn exec turbo dev --filter=web
-pnpm exec turbo dev --filter=web
-```
-
-### Remote Caching
-
-> [!TIP]
-> Vercel Remote Cache is free for all plans. Get started today at [vercel.com](https://vercel.com/signup?/signup?utm_source=remote-cache-sdk&utm_campaign=free_remote_cache).
-
-Turborepo can use a technique known as [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching) to share cache artifacts across machines, enabling you to share build caches with your team and CI/CD pipelines.
-
-By default, Turborepo will cache locally. To enable Remote Caching you will need an account with Vercel. If you don't have an account you can [create one](https://vercel.com/signup?utm_source=turborepo-examples), then enter the following commands:
-
-```
-cd my-turborepo
-
-# With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended)
-turbo login
-
-# Without [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation), use your package manager
-npx turbo login
-yarn exec turbo login
-pnpm exec turbo login
-```
-
-This will authenticate the Turborepo CLI with your [Vercel account](https://vercel.com/docs/concepts/personal-accounts/overview).
-
-Next, you can link your Turborepo to your Remote Cache by running the following command from the root of your Turborepo:
-
-```
-# With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended)
-turbo link
-
-# Without [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation), use your package manager
-npx turbo link
-yarn exec turbo link
-pnpm exec turbo link
-```
-
-## Useful Links
-
-Learn more about the power of Turborepo:
-
-- [Tasks](https://turborepo.dev/docs/crafting-your-repository/running-tasks)
-- [Caching](https://turborepo.dev/docs/crafting-your-repository/caching)
-- [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching)
-- [Filtering](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters)
-- [Configuration Options](https://turborepo.dev/docs/reference/configuration)
-- [CLI Usage](https://turborepo.dev/docs/reference/command-line-reference)
-=======
-# drawit
-DrawIt is a real-time collaborative drawing application inspired by Excalidraw It allows multiple users to draw, sketch, and brainstorm together on a shared canvas with instant synchronization using websockets
->>>>>>> b019d07551229c120985f5770413adbd08425b0b
+MIT
