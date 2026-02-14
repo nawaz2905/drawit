@@ -13,7 +13,7 @@ const app = express();
 app.use(express.json());
 app.use(cors())
 
-app.post("/api/v1/signup", async (req, res) => {
+app.post("/signup", async (req, res) => {
     try {
         const parsedData = SignupZodSchema.safeParse(req.body);
         if (!parsedData.success) {
@@ -56,7 +56,7 @@ app.post("/api/v1/signup", async (req, res) => {
     }
 });
 
-app.post("/api/v1/signin", async (req, res) => {
+app.post("/signin", async (req, res) => {
     try {
         const parsedData = SigninZodSchema.safeParse(req.body);
         if (!parsedData.success) {
@@ -104,7 +104,7 @@ app.post("/api/v1/signin", async (req, res) => {
     }
 });
 
-app.post("/api/v1/room",middleware, async (req, res) => {
+app.post("/room",middleware, async (req, res) => {
     
     const parsedData = CreateRoomSchema.safeParse(req.body);
     if(!parsedData.success){
@@ -133,7 +133,7 @@ app.post("/api/v1/room",middleware, async (req, res) => {
     }
 });
 
-app.get("/api/v1/chats/:roomId", async (req, res)=>{
+app.get("/chats/:roomId", async (req, res)=>{
     try{
         const roomId = Number(req.params.roomId);
         console.log(req.params.roomId);
@@ -158,7 +158,7 @@ app.get("/api/v1/chats/:roomId", async (req, res)=>{
     }
 });
 
-app.get("/api/v1/chats/:slug", async (req, res) =>{
+app.get("/chats/:slug", async (req, res) =>{
     const slug = req.params.slug;
     const room = await prisma.room.findFirst({
         where:{
@@ -189,7 +189,7 @@ app.get("/api/v1/chats/:slug", async (req, res) =>{
     });
 });
 
-app.post("/api/v1/savemessage", (req,res)=>{
+app.post("/savemessage", (req,res)=>{
     const chat = req.body.chat;
     const slug = req.body.slug;
 
@@ -200,7 +200,7 @@ app.post("/api/v1/savemessage", (req,res)=>{
     });
 })
 //@ts-ignore
-app.post("/api/v1/deletechat/:slug", async (req, res)=>{
+app.post("/deletechat/:slug", async (req, res)=>{
     try{
         const slug = req.params.slug;
         const type = req.body.type;
@@ -261,7 +261,7 @@ app.post("/api/v1/deletechat/:slug", async (req, res)=>{
 
 })
 
-app.post("/api/v1/deleteshape/:roomId", async(req, res)=>{
+app.post("/deleteshape/:roomId", async(req, res)=>{
     try{
         const roomId = Number(req.params.roomId);
         const {type, startX, startY, endY, endX } = req.body;
@@ -308,7 +308,7 @@ app.post("/api/v1/deleteshape/:roomId", async(req, res)=>{
     }
 });
 
-app.get("/api/v1/room/slug/:slug", async(req, res)=>{
+app.get("/room/slug/:slug", async(req, res)=>{
     const slug = req.params.slug;
     try{
         const room = await prisma.room.findFirst({
@@ -332,7 +332,7 @@ app.get("/api/v1/room/slug/:slug", async(req, res)=>{
 
 })
 
-app.get("/api/v1/room/id/:roomId", async(req, res)=>{
+app.get("/room/id/:roomId", async(req, res)=>{
     const roomId = Number(req.params.roomId);
     const room = await prisma.room.findFirst({
         where:{
@@ -346,7 +346,7 @@ app.get("/api/v1/room/id/:roomId", async(req, res)=>{
 });
 
 
-app.post("/api/v1/createroom/:slug", async(req, res)=>{
+app.post("/createroom/:slug", async(req, res)=>{
     const slug = req.params.slug;
     try{
         const room = await prisma.room.create({
