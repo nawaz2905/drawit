@@ -133,27 +133,21 @@ app.post("/room",middleware, async (req, res) => {
     }
 });
 
-app.get("/chats/:roomId", async (req, res)=>{
+app.get("/roomchats/:roomId", async (req, res)=>{
     try{
         const roomId = Number(req.params.roomId);
-        console.log(req.params.roomId);
-        const message = await prisma.chat.findMany({
+        const room = await prisma.room.findFirst({
             where:{
-                roomId: roomId
-            },
-            orderBy:{
-                id:"desc"
-            },
-            take: 1000
+                id: roomId,
+            }
         });
         res.json({
-            message
+            slug: room?.slug,
         })
 
     }catch(e){
-        console.log(e);
         res.json({
-            messages: []
+            messages: "Issue in fetching",
         })
     }
 });
