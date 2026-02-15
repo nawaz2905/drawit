@@ -21,10 +21,10 @@ app.post("/signup", async (req, res) => {
                 message: "Invalid input format"
             });
         }
-        const { username, password, name } = parsedData.data;
+        const { email, password, name } = parsedData.data;
         const existingUser = await prisma.user.findFirst({
             where: {
-                email: username
+                email: email
             }
         });
         if (existingUser) {
@@ -37,7 +37,7 @@ app.post("/signup", async (req, res) => {
 
         const user = await prisma.user.create({
             data: {
-                email: username,
+                email: email,
                 password: hashedPassword,
                 name: name
             }
@@ -66,11 +66,11 @@ app.post("/signin", async (req, res) => {
             });
         }
 
-        const { username, password } = parsedData.data;
+        const { email, password } = parsedData.data;
 
         const user = await prisma.user.findFirst({
             where: {
-                email: username
+                email: email
             }
         });
 
