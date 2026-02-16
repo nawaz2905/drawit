@@ -2,9 +2,9 @@ import axios from 'axios';
 
 export async function handleDeletion(roomId: any, type: string, startX: number, startY: number, endX: number, endY: number) {
     try {
-        const slugResponse = await axios.get(`http://localhost:3001/api/v1/room/id/${roomId}`);
+        const slugResponse = await axios.get(`http://localhost:3001/room/id/${roomId}`);
         const slug = slugResponse.data.slug;
-        const response = await axios.post(`http://localhost:3001/api/v1/deletechat/${slug}`, {
+        const response = await axios.post(`http://localhost:3001/deletechat/${slug}`, {
             type: type,
             startX: startX,
             startY: startY,
