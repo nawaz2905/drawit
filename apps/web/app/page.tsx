@@ -80,7 +80,7 @@ export default function Home() {
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
               <button
-                onClick={() => router.push("/room")}
+                onClick={() => router.push("/signup")}
                 className="group w-full sm:w-auto px-8 py-4 bg-white text-black font-bold rounded-2xl flex items-center justify-center gap-2 hover:bg-zinc-100 transition-all active:scale-[0.98]"
               >
                 Start Drawing Free
