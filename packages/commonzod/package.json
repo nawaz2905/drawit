@@ -2,7 +2,7 @@
   "name": "@repo/commonzod",
   "version": "1.0.0",
   "exports": {
-    "./types": "./src/types.ts"
+    "./types": "./dist/types.js"
   },
   "scripts": {
     "build": "tsc -b",
@@ -11,6 +11,9 @@
   "dependencies": {
     "@repo/typescript-config": "workspace:*",
     "zod": "^4.3.5"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.3"
   },
   "keywords": [],
   "author": "",

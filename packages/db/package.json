@@ -2,12 +2,12 @@
   "name": "@repo/db",
   "version": "1.0.0",
   "exports": {
-    "./client": "./src/index.ts"
+    "./client": "./dist/index.js"
   },
   "description": "",
   "main": "index.js",
   "scripts": {
-    "build": "prisma generate",
+    "build": "prisma generate && tsc -b",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -17,5 +17,8 @@
     "@prisma/client": "6",
     "@repo/typescript-config": "workspace:*",
     "prisma": "6"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.3"
   }
 }

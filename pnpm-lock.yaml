@@ -161,6 +161,9 @@ importers:
       '@repo/typescript-config':
         specifier: workspace:*
         version: link:../typescript-config
+      '@types/node':
+        specifier: ^22.15.3
+        version: 22.15.3
 
   packages/commonzod:
     dependencies:
@@ -170,6 +173,10 @@ importers:
       zod:
         specifier: ^4.3.5
         version: 4.3.5
+    devDependencies:
+      '@types/node':
+        specifier: ^22.15.3
+        version: 22.15.3
 
   packages/db:
     dependencies:
@@ -182,6 +189,10 @@ importers:
       prisma:
         specifier: '6'
         version: 6.19.2(typescript@5.9.2)
+    devDependencies:
+      '@types/node':
+        specifier: ^22.15.3
+        version: 22.15.3
 
   packages/eslint-config:
     devDependencies:
