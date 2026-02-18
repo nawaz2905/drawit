@@ -1,0 +1,60 @@
+services:
+  - type: web
+    name: drawit-http-backend
+    env: node
+    plan: free
+    buildCommand: pnpm install && pnpm build
+    startCommand: pnpm --filter http-backend start
+    envVars:
+      - key: NODE_VERSION
+        value: 18
+      - key: DATABASE_URL
+        fromDatabase:
+          name: drawit-db
+          property: connectionString
+      - key: JWT_PASSCODE
+        generateValue: true
+
+  - type: web
+    name: drawit-ws-backend
+    env: node
+    plan: free
+    buildCommand: pnpm install && pnpm build
+    startCommand: pnpm --filter ws-backend start
+    envVars:
+      - key: NODE_VERSION
+        value: 18
+      - key: DATABASE_URL
+        fromDatabase:
+          name: drawit-db
+          property: connectionString
+      - key: JWT_PASSCODE
+        fromService:
+          type: web
+          name: drawit-http-backend
+          property: envVar
+          envVar: JWT_PASSCODE
+
+  - type: web
+    name: drawit-frontend
+    env: node
+    plan: free
+    buildCommand: pnpm install && pnpm build
+    startCommand: pnpm --filter web start
+    envVars:
+      - key: NODE_VERSION
+        value: 18
+      - key: NEXT_PUBLIC_API_URL
+        fromService:
+          type: web
+          name: drawit-http-backend
+          property: host
+      - key: NEXT_PUBLIC_WS_URL
+        fromService:
+          type: web
+          name: drawit-ws-backend
+          property: host
+
+databases:
+  - name: drawit-db
+    plan: free
