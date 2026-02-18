@@ -5,13 +5,18 @@ import { prisma } from '@repo/db/client'
 
 import http from "http";
 
+
 const PORT = process.env.PORT || 8080;
 
-const server = http.createServer();
+const server = http.createServer((req, res) => {
+    res.writeHead(200);
+    res.end("WebSocket server running");
+});
+
 const wss = new WebSocketServer({ server });
 
-server.listen(PORT, () => {
-  console.log(`WebSocket running on ${PORT}`);
+server.listen(Number(PORT), "0.0.0.0", () => {
+    console.log(`WebSocket running on ${PORT}`);
 });
 
 interface User {
