@@ -87,7 +87,7 @@ export default function Home() {
                 <ChevronRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
               </button>
               <a
-                href="https://github.com"
+                href="https://github.com/nawaz2905/drawit"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="w-full sm:w-auto px-8 py-4 bg-zinc-900 text-white font-bold rounded-2xl flex items-center justify-center gap-2 border border-zinc-800 hover:bg-zinc-800 transition-all active:scale-[0.98]"
