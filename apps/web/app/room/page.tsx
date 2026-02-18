@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import axios from "axios";
+import {api} from '../../lib/api' 
 import { useRouter } from "next/navigation";
 import { jwtDecode } from "jwt-decode";
 import { motion, AnimatePresence } from "framer-motion";
@@ -24,7 +24,7 @@ function Room() {
         setLoading(true);
         setError("");
         try {
-            const response = await axios.get(`http://localhost:3001/room/slug/${slug}`);
+            const response = await api.get(`/room/slug/${slug}`);
             const roomId = response.data.id;
 
             if (!roomId) {
@@ -61,7 +61,7 @@ function Room() {
                 return;
             }
             const userId = decoded.userId;
-            const response = await axios.post(`http://localhost:3001/createroom/${slugCreate}`, {
+            const response = await api.post(`/createroom/${slugCreate}`, {
                 adminId: userId,
             })
             const roomId = response.data.roomId;

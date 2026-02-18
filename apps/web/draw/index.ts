@@ -1,4 +1,4 @@
-import axios from "axios";
+import { api } from "../lib/api";
 
 
 export async function initDraw(canvas: any, roomId: string, socket: WebSocket) {
@@ -231,9 +231,9 @@ function clearCanvas(
 }
 
 async function getExistingShapes(roomId: string) {
-  const slug = await axios.get(`http://localhost:3001/roomchats/${roomId}`);
+  const slug = await api.get(`/roomchats/${roomId}`);
 
-  const res = await axios.get(`http://localhost:3001/chats/chatroom`);
+  const res = await api.get(`/chats/chatroom`);
 
   const messages: string[] = res.data.messages;
 

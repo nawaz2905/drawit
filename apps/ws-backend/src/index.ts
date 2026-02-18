@@ -3,8 +3,17 @@ import { JWT_PASSCODE } from "@repo/backend-common/config";
 import jwt from 'jsonwebtoken'
 import { prisma } from '@repo/db/client'
 
+import http from "http";
 
-const wss = new WebSocketServer({ port: 8080 });
+const PORT = process.env.PORT || 8080;
+
+const server = http.createServer();
+const wss = new WebSocketServer({ server });
+
+server.listen(PORT, () => {
+  console.log(`WebSocket running on ${PORT}`);
+});
+
 interface User {
     ws: WebSocket,
     rooms: string[],

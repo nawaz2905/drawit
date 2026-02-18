@@ -1,16 +1,16 @@
-import axios from "axios";
+import {api} from '../lib/api'
 
 export async function getExistingShapes(roomId:Number){
     try{
-        const slugResponce = await axios.get(
-            `http://localhost:3001/roomchats/${roomId}`,
+        const slugResponce = await api.get(
+            `/roomchats/${roomId}`,
         );
         const slug = slugResponce.data.slug;
 
         if(!slug){
             return[];
         }
-        const res = await axios.get(`http://localhost:3001/chats/${slug}`);
+        const res = await api.get(`/chats/${slug}`);
 
         const message: string[] = res.data.message || [];
         const shapes:any = message

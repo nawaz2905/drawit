@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { Canvas } from "./Canvas";
 import { useRouter } from "next/navigation";
+import {WS_URL} from '../lib/socket'
 
 export function RoomCanvas({ roomId }: { roomId: string }) {
     const [socket, setSocket] = useState<WebSocket | null>(null);
@@ -17,7 +18,7 @@ export function RoomCanvas({ roomId }: { roomId: string }) {
             setTimeout(() => router.push("/signin"), 1500);
             return;
         }
-        const ws = new WebSocket(`ws://localhost:8080?token=${token}`)
+        const ws = new WebSocket(`${WS_URL}?token=${token}`)
 
         ws.onopen = () => {
             setSocket(ws);

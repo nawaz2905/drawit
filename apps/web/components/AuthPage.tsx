@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import axios from "axios";
+import { api } from "../lib/api";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { Mail, Lock, User, Loader2, ArrowRight, Paintbrush, AlertCircle } from "lucide-react";
@@ -21,7 +21,7 @@ export function AuthPage({ isSignin }: { isSignin: boolean }) {
 
         try {
             if (isSignin) {
-                const response = await axios.post("http://localhost:3001/signin", {
+                const response = await api.post("/signin", {
                     email,
                     password,
                 });
@@ -32,13 +32,13 @@ export function AuthPage({ isSignin }: { isSignin: boolean }) {
                 localStorage.setItem("token", response.data.token);
                 router.push("/room");
             } else {
-                const response = await axios.post("http://localhost:3001/signup", {
+                const response = await api.post("/signup", {
                     email,
                     password,
                     name,
                 });
-                const signinResponse = await axios.post(
-                    "http://localhost:3001/signin", {
+                const signinResponse = await api.post(
+                    "/signin", {
                     email,
                     password,
                 },

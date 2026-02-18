@@ -1,10 +1,11 @@
-import axios from 'axios';
+
+import {api} from '../lib/api'
 
 export async function handleDeletion(roomId: any, type: string, startX: number, startY: number, endX: number, endY: number) {
     try {
-        const slugResponse = await axios.get(`http://localhost:3001/room/id/${roomId}`);
+        const slugResponse = await api.get(`/room/id/${roomId}`);
         const slug = slugResponse.data.slug;
-        const response = await axios.post(`http://localhost:3001/deletechat/${slug}`, {
+        const response = await api.post(`/deletechat/${slug}`, {
             type: type,
             startX: startX,
             startY: startY,
