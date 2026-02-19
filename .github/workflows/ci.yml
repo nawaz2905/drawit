@@ -23,3 +23,20 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       - run: pnpm turbo build
+
+deploy:
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Trigger HTTP Backend Deploy
+        run: |
+          curl -X POST \
+          -H "Authorization: Bearer ${{ secrets.RENDER_API_KEY }}" \
+          https://api.render.com/v1/services/srv-d6an5m3h46gs738hl900/deploys
+
+      - name: Trigger WS Backend Deploy
+        run: |
+          curl -X POST \
+          -H "Authorization: Bearer ${{ secrets.RENDER_API_KEY }}" \
+          https://api.render.com/v1/services/srv-d6arafsr85hc73erehjg/deploys
