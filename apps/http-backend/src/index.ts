@@ -2,6 +2,7 @@ import "dotenv/config";
 // console.log("DB URL =>", process.env.DATABASE_URL);
 import jwt from 'jsonwebtoken';
 import bcrypt from "bcrypt";
+import crypto from 'crypto';
 import { JWT_PASSCODE } from '@repo/backend-common/config';
 import { SignupZodSchema, SigninZodSchema, CreateRoomSchema } from '@repo/commonzod/types';
 import { prisma } from '@repo/db/client';
@@ -57,6 +58,60 @@ app.post("/signup", async (req, res) => {
     }
 });
 
+app.post("/oauth-login", async (req, res) => {
+    try {
+        const { email, name, provider } = req.body;
+
+        if (!email) {
+            return res.status(400).json({
+                message: "Email is required"
+            });
+        }
+
+        let user = await prisma.user.findFirst({
+            where: {
+                email: email
+            }
+        });
+
+        let isNewUser = false;
+
+        if (!user) {
+            isNewUser = true;
+            // Generate a random password for OAuth users so the field is never null/empty.
+            // The password is hashed and stored but never used for login — OAuth users
+            // are authenticated purely by their verified email from the provider.
+            const randomPassword = crypto.randomUUID();
+            const hashedPassword = await bcrypt.hash(randomPassword, 10);
+
+            user = await prisma.user.create({
+                data: {
+                    email: email,
+                    name: name || "",
+                    provider: provider || "oauth",
+                    password: hashedPassword
+                }
+            });
+        }
+
+        const token = jwt.sign({
+            userId: user.id
+        }, JWT_PASSCODE);
+
+        return res.status(200).json({
+            message: "Signed in successfully",
+            token: token,
+            isNewUser: isNewUser
+        });
+
+    } catch (e) {
+        console.error("OAuth Login error:", e);
+        return res.status(500).json({
+            message: "Internal Server Error"
+        });
+    }
+});
+
 app.post("/signin", async (req, res) => {
     try {
         const parsedData = SigninZodSchema.safeParse(req.body);
@@ -78,6 +133,12 @@ app.post("/signin", async (req, res) => {
         if (!user) {
             return res.status(403).json({
                 message: "Incorrect credentials!"
+            });
+        }
+
+        if (!user.password) {
+            return res.status(403).json({
+                message: "This account uses OAuth. Please sign in with Google or GitHub."
             });
         }
 
