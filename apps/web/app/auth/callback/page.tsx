@@ -26,15 +26,7 @@ function AuthCallbackContent() {
                         provider: (session.user as any).provider ?? "oauth"
                     });
 
-                    const { token, isNewUser } = response.data;
-
-                    // If the user came from the signup page but already has an account, block them
-                    if (intent === "signup" && !isNewUser) {
-                        setErrorMsg(
-                            "An account with this email already exists. Please sign in instead."
-                        );
-                        return;
-                    }
+                    const { token } = response.data;
 
                     if (token) {
                         localStorage.setItem("token", token);

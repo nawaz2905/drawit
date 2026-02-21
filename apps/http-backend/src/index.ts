@@ -74,23 +74,9 @@ app.post("/oauth-login", async (req, res) => {
             }
         });
 
-        let isNewUser = false;
-
         if (!user) {
-            isNewUser = true;
-            // Generate a random password for OAuth users so the field is never null/empty.
-            // The password is hashed and stored but never used for login — OAuth users
-            // are authenticated purely by their verified email from the provider.
-            const randomPassword = crypto.randomUUID();
-            const hashedPassword = await bcrypt.hash(randomPassword, 10);
-
-            user = await prisma.user.create({
-                data: {
-                    email: email,
-                    name: name || "",
-                    provider: provider || "oauth",
-                    password: hashedPassword
-                }
+            return res.status(403).json({
+                message: "This email is not registered. Please sign up with an email and password first."
             });
         }
 
@@ -100,8 +86,7 @@ app.post("/oauth-login", async (req, res) => {
 
         return res.status(200).json({
             message: "Signed in successfully",
-            token: token,
-            isNewUser: isNewUser
+            token: token
         });
 
     } catch (e) {
