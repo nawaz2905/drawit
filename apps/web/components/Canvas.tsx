@@ -13,7 +13,7 @@ export function Canvas({
     roomId: number;
     socket: WebSocket;
 }) {
-    const { canvasRef, selectedTool, setSelectedTool } = useGame(roomId, socket);
+    const { bgCanvasRef, topCanvasRef, selectedTool, setSelectedTool } = useGame(roomId, socket);
 
     return (
         <div className="h-screen w-screen overflow-hidden bg-zinc-50 relative" >
@@ -26,8 +26,13 @@ export function Canvas({
             />
 
             <canvas
-                ref={canvasRef}
-                className="relative z-10 w-full h-full block cursor-crosshair"
+                ref={bgCanvasRef}
+                className="absolute inset-0 z-10 w-full h-full block"
+            />
+
+            <canvas
+                ref={topCanvasRef}
+                className="absolute inset-0 z-20 w-full h-full block cursor-crosshair"
             />
 
             <TopBar setSelectedTool={setSelectedTool} selectedTool={selectedTool} />

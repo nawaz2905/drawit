@@ -210,21 +210,11 @@ app.get("/chats/:slug", async (req, res) => {
         }
     });
     const roomArray = room?.chats ?? [];
+    const messages = roomArray.map((chat: any) => ({
+        id: chat.id,
+        message: chat.message
+    }));
 
-    const messages = [];
-    for (const chat of roomArray) {
-        try {
-            if (typeof chat.message === "string") {
-            } else {
-                //@ts-ignore
-                messages.push(...chat.message);
-            }
-        } catch (e) {
-            res.json({
-                message: "some issue"
-            });
-        }
-    }
     res.json({
         messages,
     });

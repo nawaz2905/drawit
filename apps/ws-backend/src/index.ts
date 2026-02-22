@@ -92,45 +92,51 @@ wss.on('connection', function connection(ws, request) {
                 const messageString = parsedData.message;
                 const message = typeof messageString === "string" ? JSON.parse(messageString) : messageString;
 
-                if (message.type === "pencil") {
-                    if (!message.BufferStroke || message.BufferStroke.length === 0) {
-                        console.error("Invalid pencil message: BufferStroke is empty/missing");
-                        return;
+                let startX = message.startX;
+                let startY = message.startY;
+                let endX = message.endX;
+                let endY = message.endY;
+
+                if (message.type === "pencil" || message.type === "eraser") {
+                    if (message.BufferStroke && message.BufferStroke.length > 0) {
+                        startX = message.BufferStroke[0][0];
+                        startY = message.BufferStroke[0][1];
+                        endX = message.BufferStroke[message.BufferStroke.length - 1][0];
+                        endY = message.BufferStroke[message.BufferStroke.length - 1][1];
                     }
-                    message.endX = message.BufferStroke[message.BufferStroke.length - 1][0];
-                    message.endY = message.BufferStroke[message.BufferStroke.length - 1][1];
+                } else if (message.type === "rect") {
+                    startX = message.x;
+                    startY = message.y;
+                    endX = message.x + message.width;
+                    endY = message.y + message.height;
+                } else if (message.type === "circle") {
+                    startX = message.centerX - message.radius;
+                    startY = message.centerY - message.radius;
+                    endX = message.centerX + message.radius;
+                    endY = message.centerY + message.radius;
                 }
 
                 const serializedMessage = JSON.stringify(message);
 
-                if (message.type === "pencil") {
-                    await prisma.chat.create({
-                        data: {
-                            roomId: roomId,
-                            type: message.type,
-                            startX: message.startX,
-                            startY: message.startY,
-                            endX: message.endX,
-                            endY: message.endY,
-                            message: serializedMessage,
-                            userId: userId
-                        },
-                    });
-                } else {
-                    await prisma.chat.create({
-                        data: {
-                            roomId: roomId,
-                            message: serializedMessage,
-                            userId: userId,
-                        },
-                    });
-                }
+                const response = await prisma.chat.create({
+                    data: {
+                        roomId: roomId,
+                        type: message.type,
+                        startX: startX ? Math.floor(startX) : null,
+                        startY: startY ? Math.floor(startY) : null,
+                        endX: endX ? Math.floor(endX) : null,
+                        endY: endY ? Math.floor(endY) : null,
+                        message: serializedMessage,
+                        userId: userId
+                    },
+                });
 
                 users.forEach((user) => {
                     if (user.rooms.includes(roomId)) {
                         user.ws.send(
                             JSON.stringify({
                                 type: "chat",
+                                id: response.id,
                                 message: serializedMessage,
                                 roomId,
                             })
@@ -141,6 +147,20 @@ wss.on('connection', function connection(ws, request) {
             } catch (e) {
                 console.log("error in sending to users or something, error is " + e);
             }
+        }
+
+        if (parsedData.type === "delete") {
+            const roomId = parsedData.roomId;
+            const id = parsedData.id;
+            users.forEach((user) => {
+                if (user.rooms.includes(roomId)) {
+                    user.ws.send(JSON.stringify({
+                        type: "delete",
+                        id,
+                        roomId
+                    }));
+                }
+            });
         }
     });
 

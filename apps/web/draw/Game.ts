@@ -2,8 +2,9 @@ import { handleDeletion } from "./deleteShape";
 
 type Tool = "circle" | "pencil" | "rect" | "hand" | "eraser";
 
-type Shape =
+export type Shape =
   | {
+    id?: number;
     type: "rect";
     x: number;
     y: number;
@@ -11,33 +12,34 @@ type Shape =
     height: number;
   }
   | {
+    id?: number;
     type: "circle";
     centerX: number;
     centerY: number;
     radius: number;
   }
   | {
+    id?: number;
     type: "pencil";
     startX: number;
     startY: number;
     endX?: number;
     endY?: number;
-    clientX?: number;
-    clientY?: number;
     BufferStroke: [number, number][];
   }
   | {
+    id?: number;
     type: "eraser";
     startX: number;
     startY: number;
-    clientX: number;
-    clientY: number;
     BufferStroke: [number, number][];
   };
 
 export class Game {
-  private canvas: HTMLCanvasElement;
-  private ctx: CanvasRenderingContext2D;
+  private bgCanvas: HTMLCanvasElement;
+  private topCanvas: HTMLCanvasElement;
+  private bgCtx: CanvasRenderingContext2D;
+  private topCtx: CanvasRenderingContext2D;
   private existingShapes: Shape[];
   private roomId: number;
   private clicked: boolean;
@@ -51,27 +53,20 @@ export class Game {
   private panX: number = 0;
   private panY: number = 0;
   private isPanning: boolean = false;
-  private noPanAndDraw: boolean = true;
-  private isPan: boolean = false;
   private lastMouseX: number = 0;
   private lastMouseY: number = 0;
-  private allRectX: any[];
-  private allRect: any[];
   private allShapeXRect: any[];
   private allShapeYRect: any[];
   socket: WebSocket;
+  private needsBgRedraw: boolean = true;
+  private needsTopRedraw: boolean = true;
+  private animationFrameId: number | null = null;
+  private activeShape: Shape | null = null;
 
-  /**
-   * Safely parses a shape that may be a string (requiring multiple JSON.parse calls)
-   * or already an object. Returns the parsed object or null if parsing fails.
-   */
   private parseShape(shape: any): any | null {
-    // If it's already an object, return it directly
     if (shape !== null && typeof shape === "object" && !Array.isArray(shape)) {
       return shape;
     }
-
-    // If it's a string, parse it once
     if (typeof shape === "string") {
       try {
         return JSON.parse(shape);
@@ -80,326 +75,193 @@ export class Game {
         return null;
       }
     }
-
     return null;
   }
 
   constructor(
-    canvas: HTMLCanvasElement,
+    bgCanvas: HTMLCanvasElement,
+    topCanvas: HTMLCanvasElement,
     roomId: number,
     socket: WebSocket,
     existingShapes: any,
     allShapeXRect: any,
     allShapeYRect: any,
   ) {
-    this.canvas = canvas;
-    this.ctx = canvas.getContext("2d")!;
+    this.bgCanvas = bgCanvas;
+    this.topCanvas = topCanvas;
+    this.bgCtx = bgCanvas.getContext("2d")!;
+    this.topCtx = topCanvas.getContext("2d")!;
     this.existingShapes = existingShapes;
     this.BufferStroke = [[-1, -1]];
     this.roomId = roomId;
     this.socket = socket;
     this.clicked = false;
-    this.canvas.width = document.body?.clientWidth || 800;
-    this.canvas.height = document.body?.clientHeight || 600;
-    this.allRectX = [];
-    this.allRect = [];
+
+    const width = document.body?.clientWidth || 800;
+    const height = document.body?.clientHeight || 600;
+
+    this.bgCanvas.width = width;
+    this.bgCanvas.height = height;
+    this.topCanvas.width = width;
+    this.topCanvas.height = height;
+
     this.allShapeXRect = allShapeXRect || [];
     this.allShapeYRect = allShapeYRect || [];
 
-    this.init();
+    this.existingShapes = this.existingShapes.map((s) => this.parseShape(s)).filter((s) => s !== null);
 
     this.initHandlers();
     this.initMouseHandlers();
-    this.checkX(0, 0);
+    this.startRenderLoop();
   }
 
   destroy() {
-    this.canvas.removeEventListener("mousedown", this.mouseDownHandler);
-
-    this.canvas.removeEventListener("mouseup", this.mouseUpHandler);
-
-    this.canvas.removeEventListener("mousemove", this.mouseMoveHandler);
-
-    this.canvas.removeEventListener("wheel", this.mouseWheelHandler);
+    if (this.animationFrameId !== null) {
+      cancelAnimationFrame(this.animationFrameId);
+    }
+    this.topCanvas.removeEventListener("mousedown", this.mouseDownHandler);
+    this.topCanvas.removeEventListener("mouseup", this.mouseUpHandler);
+    this.topCanvas.removeEventListener("mousemove", this.mouseMoveHandler);
+    this.topCanvas.removeEventListener("wheel", this.mouseWheelHandler);
   }
 
-  setTool(tool: "circle" | "pencil" | "rect" | "hand" | "eraser") {
+  setTool(tool: Tool) {
     this.selectedTool = tool;
   }
 
-  async init() {
-    this.clearCanvas();
+  private startRenderLoop() {
+    const loop = () => {
+      this.render();
+      this.animationFrameId = requestAnimationFrame(loop);
+    };
+    this.animationFrameId = requestAnimationFrame(loop);
   }
 
-  checkX(x: number, y: number) {
-    if (this.allShapeXRect.includes(x) && this.allShapeYRect.includes(y)) {
-      this.canvas.style.cursor = "nwse-resize";
-      setTimeout(() => {
-        this.canvas.style.cursor = "default";
-      }, 100);
+  private triggerBgRedraw() {
+    this.needsBgRedraw = true;
+  }
+
+  private triggerTopRedraw() {
+    this.needsTopRedraw = true;
+  }
+
+  private render() {
+    if (this.needsBgRedraw) {
+      this.renderBackground();
+      this.needsBgRedraw = false;
+    }
+    if (this.needsTopRedraw) {
+      this.renderTop();
+      this.needsTopRedraw = false;
+    }
+  }
+
+  private renderBackground() {
+    this.bgCtx.setTransform(this.scale, 0, 0, this.scale, this.panX, this.panY);
+    this.bgCtx.fillStyle = "rgba(0, 0, 0)";
+    this.bgCtx.fillRect(
+      -this.panX / this.scale,
+      -this.panY / this.scale,
+      this.bgCanvas.width / this.scale,
+      this.bgCanvas.height / this.scale,
+    );
+
+    this.existingShapes.forEach((shape) => {
+      this.drawShape(this.bgCtx, shape);
+    });
+  }
+
+  private renderTop() {
+    this.topCtx.setTransform(this.scale, 0, 0, this.scale, this.panX, this.panY);
+    this.topCtx.clearRect(
+      -this.panX / this.scale,
+      -this.panY / this.scale,
+      this.topCanvas.width / this.scale,
+      this.topCanvas.height / this.scale,
+    );
+
+    if (this.activeShape) {
+      this.drawShape(this.topCtx, this.activeShape);
+    }
+  }
+
+  private drawShape(ctx: CanvasRenderingContext2D, shape: Shape) {
+    if (!shape) return;
+
+    ctx.strokeStyle = "rgba(255, 255, 255)";
+    ctx.lineWidth = 1 / this.scale;
+
+    if (shape.type === "rect") {
+      ctx.strokeRect(shape.x, shape.y, shape.width, shape.height);
+    } else if (shape.type === "circle") {
+      ctx.beginPath();
+      ctx.arc(shape.centerX, shape.centerY, Math.abs(shape.radius), 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.closePath();
+    } else if (shape.type === "pencil" || shape.type === "eraser") {
+      if (shape.type === "eraser") {
+        ctx.lineWidth = 10 / this.scale;
+      }
+      const points = shape.BufferStroke;
+      if (points.length < 2) return;
+
+      ctx.beginPath();
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+
+      let started = false;
+      for (const point of points) {
+        if (point[0] === -1 && point[1] === -1) continue;
+        if (!started) {
+          ctx.moveTo(point[0], point[1]);
+          started = true;
+        } else {
+          ctx.lineTo(point[0], point[1]);
+        }
+      }
+      ctx.stroke();
     }
   }
 
   initHandlers() {
     this.socket.onmessage = (event) => {
       const data = JSON.parse(event.data);
-
       if (data.type === "chat") {
         const message = typeof data.message === "string" ? JSON.parse(data.message) : data.message;
-        this.existingShapes.push(message);
-        this.clearCanvas();
+        const parsedShape = this.parseShape(message);
+        if (parsedShape) {
+          parsedShape.id = data.id;
+
+          // Check if we already have this shape by ID
+          const existingById = this.existingShapes.find(s => s.id === parsedShape.id);
+          if (existingById) return;
+
+          // Check if we have a local shape (no ID) that matches this one
+          // This prevents duplication for the sender
+          const localMatch = this.existingShapes.find(s =>
+            !s.id &&
+            s.type === parsedShape.type &&
+            JSON.stringify(s) === JSON.stringify({ ...parsedShape, id: undefined })
+          );
+
+          if (localMatch) {
+            localMatch.id = parsedShape.id;
+          } else {
+            this.existingShapes.push(parsedShape);
+            this.triggerBgRedraw();
+          }
+        }
+      } else if (data.type === "delete") {
+        const deleteId = data.id;
+        this.existingShapes = this.existingShapes.filter(s => s.id !== deleteId);
+        this.triggerBgRedraw();
       }
     };
   }
 
-  forPanClearCanvas() {
-    this.ctx.setTransform(this.scale, 0, 0, this.scale, this.panX, this.panY);
-    this.ctx.clearRect(
-      -this.panX / this.scale,
-      -this.panY / this.scale,
-
-      this.canvas.width / this.scale,
-      this.canvas.height / this.scale,
-    );
-
-    this.ctx.fillStyle = "rgba(0, 0, 0)";
-    this.ctx.fillRect(
-      -this.panX / this.scale,
-      -this.panY / this.scale,
-      this.canvas.width / this.scale,
-      this.canvas.height / this.scale,
-    );
-
-    this.existingShapes.forEach((shape) => {
-      if (shape !== null && typeof shape === "object") {
-        if (shape.type === "rect") {
-          this.ctx.strokeStyle = "rgba(255, 255, 255)";
-          this.ctx.strokeRect(shape.x, shape.y, shape.width, shape.height);
-        } else if (shape.type === "circle") {
-          this.ctx.beginPath();
-          this.ctx.arc(
-            shape.centerX,
-            shape.centerY,
-            Math.abs(shape.radius),
-            0,
-            Math.PI * 2,
-          );
-          this.ctx.stroke();
-          this.ctx.closePath();
-        } else if (shape.type === "pencil") {
-          this.ctx.lineWidth = 1;
-          this.ctx.strokeStyle = "rgba(255, 255, 255)";
-          this.ctx.lineCap = "round";
-          this.ctx.lineJoin = "round";
-
-          if (shape.BufferStroke.length < 1) return;
-          const firstPoint = shape.BufferStroke[0];
-          if (!firstPoint || firstPoint[0] === -1 || firstPoint[1] === -1) return;
-
-          this.ctx.beginPath();
-          this.ctx.moveTo(firstPoint[0], firstPoint[1]);
-
-          for (let i = 1; i < shape.BufferStroke.length; i++) {
-            const point = shape.BufferStroke[i];
-            if (point) {
-              this.ctx.lineTo(point[0], point[1]);
-            }
-          }
-
-          this.ctx.stroke();
-        }
-      } else {
-        const theshape = this.parseShape(shape);
-        if (theshape === null) return;
-
-        if (theshape.type === "rect") {
-          this.ctx.strokeStyle = "rgba(255,255,255)";
-          this.ctx.strokeRect(
-            theshape.x,
-            theshape.y,
-            theshape.width,
-            theshape.height,
-          );
-        } else if (theshape.type === "circle") {
-          this.ctx.strokeStyle = "rgba(255,255,255)";
-          this.ctx.beginPath();
-
-          this.ctx.arc(
-            theshape.centerX,
-            theshape.centerY,
-            Math.abs(theshape.radius),
-            0,
-            Math.PI * 2,
-          );
-          this.ctx.stroke();
-        } else if (theshape.type === "pencil") {
-          this.ctx.lineWidth = 1;
-          this.ctx.strokeStyle = "rgba(255,255,255)";
-          this.ctx.lineCap = "round";
-          this.ctx.lineJoin = "round";
-
-          if (theshape.BufferStroke.length < 2) return;
-          const firstPoint = theshape.BufferStroke[0];
-          if (!firstPoint) return;
-
-          this.ctx.beginPath();
-          this.ctx.moveTo(
-            firstPoint[0],
-            firstPoint[1],
-          );
-
-          for (let i = 1; i < theshape.BufferStroke.length; i++) {
-            const point = theshape.BufferStroke[i];
-            if (point) {
-              this.ctx.lineTo(
-                point[0],
-                point[1],
-              );
-            }
-          }
-
-          this.ctx.stroke();
-        }
-      }
-    });
-  }
-
-  // shouldErase(BufferStroke: any[]) {
-  //   // the BufferStroke in the argument are the points of the eraser trail
-
-
-  // }
-
-  clearCanvas() {
-    if (!this.ctx) {
-      return;
-    }
-    this.ctx.setTransform(this.scale, 0, 0, this.scale, this.panX, this.panY);
-    this.ctx.clearRect(
-      -this.panX / this.scale,
-      -this.panY / this.scale,
-
-      this.canvas.width / this.scale,
-      this.canvas.height / this.scale,
-    );
-
-    this.ctx.fillStyle = "rgba(0, 0, 0)";
-    this.ctx.fillRect(
-      -this.panX / this.scale,
-      -this.panY / this.scale,
-      this.canvas.width / this.scale,
-      this.canvas.height / this.scale,
-    );
-
-    this.existingShapes.map((shape) => {
-      // In JS/TS typeof null is "object" so if we keep check like 
-      // if (typeof shape === "object") then it will pass for null
-      if (shape !== null && typeof shape === "object") {
-        if (shape.type === "rect") {
-          this.ctx.strokeStyle = "rgba(255, 255, 255)";
-          this.ctx.strokeRect(shape.x, shape.y, shape.width, shape.height);
-        } else if (shape.type === "circle") {
-          this.ctx.beginPath();
-          this.ctx.arc(
-            shape.centerX,
-            shape.centerY,
-            Math.abs(shape.radius),
-            0,
-            Math.PI * 2,
-          );
-          this.ctx.stroke();
-          this.ctx.closePath();
-        } else if (shape.type === "pencil") {
-          this.ctx.lineWidth = 1;
-          this.ctx.strokeStyle = "rgba(255, 255, 255)";
-          this.ctx.lineCap = "round";
-          this.ctx.lineJoin = "round";
-
-          if (shape.BufferStroke.length < 2) return;
-          const firstPoint = shape.BufferStroke[0];
-          if (!firstPoint) return;
-
-          this.ctx.beginPath();
-          this.ctx.moveTo(firstPoint[0], firstPoint[1]);
-
-          for (let i = 1; i < shape.BufferStroke.length; i++) {
-            const point = shape.BufferStroke[i];
-            if (point) {
-              this.ctx.lineTo(point[0], point[1]);
-            }
-          }
-
-          this.ctx.stroke();
-        }
-      } else {
-        // console.log("came inside the else of the clearCanvas");
-        // console.log("shape is " + shape);
-        // console.log("shape.type is below");
-        // console.log((JSON.parse(JSON.parse(JSON.parse(shape))) as any).type);
-        try {
-          const theshape = this.parseShape(shape);
-          if (theshape !== null && typeof theshape === "object") {
-            if (theshape.type === "rect") {
-              this.ctx.strokeStyle = "rgba(255,255,255)";
-              this.ctx.strokeRect(
-                theshape.x,
-                theshape.y,
-                theshape.width,
-                theshape.height,
-              );
-            } else if (theshape.type === "circle") {
-              this.ctx.strokeStyle = "rgba(255,255,255)";
-              this.ctx.beginPath();
-
-              this.ctx.arc(
-                theshape.centerX,
-                theshape.centerY,
-                Math.abs(theshape.radius),
-                0,
-                Math.PI * 2,
-              );
-              this.ctx.stroke();
-            } else if (theshape.type === "pencil") {
-              this.ctx.lineWidth = 1;
-              this.ctx.strokeStyle = "rgba(255,255,255)";
-              this.ctx.lineCap = "round";
-              this.ctx.lineJoin = "round";
-
-              const firstPoint = theshape.BufferStroke[0];
-              if (!firstPoint || (firstPoint[0] === -1 && firstPoint[1] === -1)) {
-                return;
-              }
-
-              this.ctx.beginPath();
-              this.ctx.moveTo(
-                // x coordinate of the first point
-                firstPoint[0],
-                // y coordinate of the first point
-                firstPoint[1],
-              );
-
-              for (let i = 1; i < theshape.BufferStroke.length; i++) {
-                const point = theshape.BufferStroke[i];
-                if (point) {
-                  this.ctx.lineTo(
-                    // x coordinate of the ith point
-                    point[0],
-                    // y coordinate of the ith point
-                    point[1],
-                  );
-                }
-              }
-
-              this.ctx.stroke();
-            }
-          }
-        } catch (error) {
-        }
-      }
-    });
-  }
-
   mouseDownHandler = (e: any) => {
+    const mouseX = e.clientX - this.topCanvas.offsetLeft;
+    const mouseY = e.clientY - this.topCanvas.offsetTop;
 
     if (this.selectedTool === "hand") {
       this.isPanning = true;
@@ -410,262 +272,235 @@ export class Game {
     this.clicked = true;
     this.startX = e.clientX;
     this.startY = e.clientY;
-    this.lastX = e.offsetX;
-    this.lastY = e.offsetY;
-    this.BufferStroke = [[-1, -1]];
-    const firstPoint = this.BufferStroke[0];
-    if (firstPoint && (firstPoint[0] === -1 || firstPoint[1] === -1)) {
-      this.BufferStroke[0] = [
-        (this.lastX - this.panX) / this.scale,
-        (this.lastY - this.panY) / this.scale];
-    } else {
-      this.BufferStroke.push([
-        (this.lastX - this.panX) / this.scale,
-        (this.lastY - this.panY) / this.scale]);
+
+    const transformedX = (mouseX - this.panX) / this.scale;
+    const transformedY = (mouseY - this.panY) / this.scale;
+
+    this.BufferStroke = [[transformedX, transformedY]];
+
+    if (this.selectedTool === "pencil") {
+      this.activeShape = {
+        type: "pencil",
+        startX: transformedX,
+        startY: transformedY,
+        BufferStroke: [...this.BufferStroke],
+      };
+    } else if (this.selectedTool === "eraser") {
+      this.activeShape = {
+        type: "eraser",
+        startX: transformedX,
+        startY: transformedY,
+        BufferStroke: [...this.BufferStroke],
+      };
+    }
+    this.triggerTopRedraw();
+  };
+
+  private eraseAt(transformedX: number, transformedY: number) {
+    const eraserRadius = 10 / this.scale;
+    let anyCollided = false;
+    this.existingShapes = this.existingShapes.filter((existing) => {
+      let collided = false;
+      if (existing.type === "pencil") {
+        collided = existing.BufferStroke.some(p => {
+          const dx = p[0] - transformedX;
+          const dy = p[1] - transformedY;
+          return Math.sqrt(dx * dx + dy * dy) < eraserRadius;
+        });
+      } else if (existing.type === "rect") {
+        const left = Math.min(existing.x, existing.x + (existing.width || 0));
+        const right = Math.max(existing.x, existing.x + (existing.width || 0));
+        const top = Math.min(existing.y, existing.y + (existing.height || 0));
+        const bottom = Math.max(existing.y, existing.y + (existing.height || 0));
+
+        collided = transformedX >= left - eraserRadius &&
+          transformedX <= right + eraserRadius &&
+          transformedY >= top - eraserRadius &&
+          transformedY <= bottom + eraserRadius;
+      } else if (existing.type === "circle") {
+        const dx = existing.centerX - transformedX;
+        const dy = existing.centerY - transformedY;
+        collided = Math.sqrt(dx * dx + dy * dy) < Math.abs(existing.radius) + eraserRadius;
+      }
+
+      if (collided) {
+        if (existing.id) {
+          this.socket.send(JSON.stringify({
+            type: "delete",
+            id: existing.id,
+            roomId: Number(this.roomId)
+          }));
+
+          let startX = 0, startY = 0, endX = 0, endY = 0;
+          if (existing.type === "rect") {
+            startX = Math.min(existing.x, existing.x + existing.width);
+            startY = Math.min(existing.y, existing.y + existing.height);
+            endX = Math.max(existing.x, existing.x + existing.width);
+            endY = Math.max(existing.y, existing.y + existing.height);
+          } else if (existing.type === "circle") {
+            const r = Math.abs(existing.radius);
+            startX = existing.centerX - r;
+            startY = existing.centerY - r;
+            endX = existing.centerX + r;
+            endY = existing.centerY + r;
+          } else if (existing.type === "pencil") {
+            startX = existing.startX; startY = existing.startY;
+            const lastPoint = existing.BufferStroke[existing.BufferStroke.length - 1];
+            if (lastPoint) {
+              endX = lastPoint[0];
+              endY = lastPoint[1];
+            } else {
+              endX = startX;
+              endY = startY;
+            }
+          }
+          handleDeletion(Number(this.roomId), existing.type, Math.floor(startX), Math.floor(startY), Math.floor(endX), Math.floor(endY));
+        }
+        anyCollided = true;
+        return false;
+      }
+      return true;
+    });
+
+    if (anyCollided) {
+      this.triggerBgRedraw();
+    }
+  }
+
+  mouseUpHandler = (e: any) => {
+    this.isPanning = false;
+    this.clicked = false;
+
+    const mouseX = e.clientX - this.topCanvas.offsetLeft;
+    const mouseY = e.clientY - this.topCanvas.offsetTop;
+    const transformedX = (mouseX - this.panX) / this.scale;
+    const transformedY = (mouseY - this.panY) / this.scale;
+
+    if (!this.activeShape && (this.selectedTool === "rect" || this.selectedTool === "circle")) {
+      const startX = (this.startX - this.bgCanvas.offsetLeft - this.panX) / this.scale;
+      const startY = (this.startY - this.bgCanvas.offsetTop - this.panY) / this.scale;
+
+      if (this.selectedTool === "rect") {
+        this.activeShape = {
+          type: "rect",
+          x: Math.min(startX, transformedX),
+          y: Math.min(startY, transformedY),
+          width: Math.abs(transformedX - startX),
+          height: Math.abs(transformedY - startY),
+        };
+      } else if (this.selectedTool === "circle") {
+        const width = transformedX - startX;
+        const height = transformedY - startY;
+        const radius = Math.sqrt(width * width + height * height) / 2;
+        this.activeShape = {
+          type: "circle",
+          radius: radius,
+          centerX: startX + width / 2,
+          centerY: startY + height / 2,
+        };
+      }
+    }
+
+    if (this.activeShape) {
+      const shape = this.activeShape;
+      if (shape.type === "eraser") {
+        this.eraseAt(transformedX, transformedY);
+      } else {
+        this.existingShapes.push(shape);
+        this.triggerBgRedraw();
+        this.socket.send(JSON.stringify({
+          type: "chat",
+          message: JSON.stringify(shape),
+          roomId: Number(this.roomId),
+        }));
+      }
+      this.activeShape = null;
+      this.triggerTopRedraw();
     }
   };
 
-  mouseUpHandler = (e: any) => {
-    // this.clearCanvas();
-    this.isPanning = false;
-    this.clicked = false;
-    const width = (e.clientX - this.startX) / this.scale;
-    const height = (e.clientY - this.startY) / this.scale;
-    // const clientX = e.clientX;
-    // const clientY = e.clientY;
-    const selectedTool = this.selectedTool;
-    if (this.isPan) {
-      this.noPanAndDraw = true;
-    }
-    let shape: Shape | null = null;
-    if (selectedTool === "rect") {
-      shape = {
-        type: "rect",
-        x: (this.startX - this.panX) / this.scale,
-        y: (this.startY - this.panY) / this.scale,
-        height,
-        width,
-      };
-    } else if (selectedTool === "circle") {
-      const radius = Math.max(width, height) / 2;
-      shape = {
-        type: "circle",
-        radius: radius,
-        centerX: (this.startX - this.panX) / this.scale + radius,
-        centerY: (this.startY - this.panY) / this.scale + radius,
-      };
-    } else if (selectedTool === "pencil") {
-      shape = {
-        type: "pencil",
-        startX: (this.startX - this.panX) / this.scale,
-        startY: (this.startY - this.panY) / this.scale,
-        endX: (e.clientX - this.panX) / this.scale,
-        endY: (e.clientY - this.panY) / this.scale,
-        clientX: (e.clientX - this.panX) / this.scale,
-        clientY: (e.clientY - this.panY) / this.scale,
-        BufferStroke: this.BufferStroke,
-      };
-    } else if (selectedTool === "eraser") {
-      shape = {
-        type: "eraser",
-        startX: (this.startX - this.panX) / this.scale,
-        startY: (this.startY - this.panY) / this.scale,
-        clientX: (e.clientX - this.panX) / this.scale,
-        clientY: (e.clientY - this.panY) / this.scale,
-        BufferStroke: this.BufferStroke,
-      };
+  mouseMoveHandler = (e: any) => {
+    const mouseX = e.clientX - this.topCanvas.offsetLeft;
+    const mouseY = e.clientY - this.topCanvas.offsetTop;
 
-      // here we will match if the eraser is intersecting with any shape
-      const eraserRadius = 10;
-      this.existingShapes = this.existingShapes.filter((theshape) => {
-        const theshapeObject = this.parseShape(theshape);
-        if (theshapeObject !== null && theshapeObject.type === "pencil") {
-          // Check if any point in the pencil stroke is within eraser radius of any eraser point
-          for (const point of theshapeObject.BufferStroke) {
-            for (const pointStroke of this.BufferStroke) {
-              const dx = point[0] - pointStroke[0];
-              const dy = point[1] - pointStroke[1];
-              const distance = Math.sqrt(dx * dx + dy * dy);
-              if (distance < eraserRadius) {
-                handleDeletion(
-                  Number(this.roomId),
-                  theshapeObject.type,
-                  theshapeObject.startX || 0,
-                  theshapeObject.startY || 0,
-                  theshapeObject.endX || 0,
-                  theshapeObject.endY || 0
-                );
-                return false; // Remove this shape (eraser touched it)
+    if (this.clicked) {
+      if (this.isPanning && this.selectedTool === "hand") {
+        const deltaX = e.clientX - this.lastMouseX;
+        const deltaY = e.clientY - this.lastMouseY;
+        this.panX += deltaX;
+        this.panY += deltaY;
+        this.lastMouseX = e.clientX;
+        this.lastMouseY = e.clientY;
+        this.triggerBgRedraw();
+        this.triggerTopRedraw();
+      } else {
+        const transformedX = (mouseX - this.panX) / this.scale;
+        const transformedY = (mouseY - this.panY) / this.scale;
+        const startX = (this.startX - this.bgCanvas.offsetLeft - this.panX) / this.scale;
+        const startY = (this.startY - this.bgCanvas.offsetTop - this.panY) / this.scale;
+
+        if (this.selectedTool === "eraser") {
+          this.eraseAt(transformedX, transformedY);
+        }
+
+        if (this.selectedTool === "rect") {
+          this.activeShape = {
+            type: "rect",
+            x: Math.min(startX, transformedX),
+            y: Math.min(startY, transformedY),
+            width: Math.abs(transformedX - startX),
+            height: Math.abs(transformedY - startY),
+          };
+        } else if (this.selectedTool === "circle") {
+          const width = transformedX - startX;
+          const height = transformedY - startY;
+          const radius = Math.sqrt(width * width + height * height) / 2;
+          this.activeShape = {
+            type: "circle",
+            radius: radius,
+            centerX: startX + width / 2,
+            centerY: startY + height / 2,
+          };
+        } else if (this.selectedTool === "pencil" || this.selectedTool === "eraser") {
+          const lastPoint = this.BufferStroke[this.BufferStroke.length - 1];
+          if (lastPoint) {
+            const dx = transformedX - lastPoint[0];
+            const dy = transformedY - lastPoint[1];
+            if (dx * dx + dy * dy > 4) {
+              this.BufferStroke.push([transformedX, transformedY]);
+              if (this.activeShape && (this.activeShape.type === "pencil" || this.activeShape.type === "eraser")) {
+                this.activeShape.BufferStroke = [...this.BufferStroke];
               }
             }
           }
         }
-        return true; // Keep this shape
-      });
-    }
-    this.lastX = e.offsetX;
-    this.lastY = e.offsetY;
-
-    this.socket.send(
-      JSON.stringify({
-        type: "chat",
-        message: JSON.stringify(shape),
-        roomId: Number(this.roomId),
-      }),
-    );
-  };
-
-  mouseMoveHandler = (e: any) => {
-    const mouseX = e.clientX - this.canvas.offsetLeft;
-    const mouseY = e.clientY - this.canvas.offsetTop;
-    this.checkX(mouseX, mouseY);
-
-    if (this.clicked) {
-      if (this.isPanning) {
-        if (this.selectedTool === "hand") {
-          const deltaX = mouseX - this.lastMouseX;
-          const deltaY = mouseY - this.lastMouseY;
-
-          this.panX += deltaX;
-          this.panY += deltaY;
-
-          this.lastMouseX = mouseX;
-          this.lastMouseY = mouseY;
-
-          this.forPanClearCanvas();
-        }
-      } else {
-        const width = (e.clientX - this.startX) / this.scale;
-        const height = (e.clientY - this.startY) / this.scale;
-
-        if (this.selectedTool === "rect" || this.selectedTool === "circle") {
-          this.clearCanvas();
-        }
-
-        this.ctx.strokeStyle = "rgba(255, 255, 255)";
-
-        const selectedTool = this.selectedTool;
-
-        if (selectedTool === "rect") {
-          this.ctx.strokeRect(
-            (this.startX - this.panX) / this.scale,
-            (this.startY - this.panY) / this.scale,
-            width,
-            height,
-          );
-        } else if (selectedTool === "circle") {
-          const radius = Math.max(width, height) / 2;
-          const centerX = (this.startX - this.panX) / this.scale + radius;
-          const centerY = (this.startY - this.panY) / this.scale + radius;
-          this.ctx.beginPath();
-          this.ctx.arc(centerX, centerY, Math.abs(radius), 0, Math.PI * 2);
-          this.ctx.stroke();
-          this.ctx.closePath();
-        } else if (selectedTool === "pencil") {
-          this.ctx.lineWidth = 1;
-          this.ctx.strokeStyle = "rgba(255, 255, 255)";
-          this.ctx.lineCap = "round";
-          this.ctx.lineJoin = "round";
-
-          const point: [number, number] = [
-            (e.offsetX - this.panX) / this.scale,
-            (e.offsetY - this.panY) / this.scale,
-          ];
-          const firstStrokePoint = this.BufferStroke[0];
-          if (firstStrokePoint && firstStrokePoint[0] === -1 && firstStrokePoint[1] === -1) {
-            this.BufferStroke[0] = [point[0], point[1]];
-          } else {
-            this.BufferStroke.push([point[0], point[1]]);
-          }
-
-          this.ctx.beginPath();
-
-          this.ctx.moveTo(
-            (this.lastX - this.panX) / this.scale,
-            (this.lastY - this.panY) / this.scale,
-          );
-          this.ctx.lineTo(
-            (e.offsetX - this.panX) / this.scale,
-            (e.offsetY - this.panY) / this.scale,
-          );
-
-          this.ctx.stroke();
-
-          this.lastX = e.offsetX;
-          this.lastY = e.offsetY;
-        } else if (selectedTool === "eraser") {
-          this.ctx.lineWidth = 10;
-          this.ctx.lineCap = "round";
-          this.ctx.lineJoin = "round";
-
-          const point: [number, number] = [
-            (e.offsetX - this.panX) / this.scale,
-            (e.offsetY - this.panY) / this.scale,
-          ];
-          const firstStrokePoint = this.BufferStroke[0];
-          if (firstStrokePoint && (firstStrokePoint[0] === -1 || firstStrokePoint[1] === -1)) {
-            this.BufferStroke[0] = [point[0], point[1]];
-          } else {
-            this.BufferStroke.push([point[0], point[1]]);
-          }
-
-          this.ctx.beginPath();
-
-          this.ctx.moveTo(
-            (this.lastX - this.panX) / this.scale,
-            (this.lastY - this.panY) / this.scale,
-          );
-
-          this.ctx.stroke();
-        }
+        this.triggerTopRedraw();
       }
     }
   };
 
   mouseWheelHandler = (e: any) => {
-    const isZoom = e.ctrlKey;
-    if (isZoom) {
+    if (e.ctrlKey) {
       e.preventDefault();
-
       const scaleAmount = -e.deltaY / 500;
-      const newScale = this.scale * (1 + scaleAmount);
-
-      const mouseX = e.clientX - this.canvas.offsetLeft;
-      const mouseY = e.clientY - this.canvas.offsetTop;
+      const newScale = Math.max(0.1, Math.min(this.scale * (1 + scaleAmount), 20));
+      const mouseX = e.clientX - this.topCanvas.offsetLeft;
+      const mouseY = e.clientY - this.topCanvas.offsetTop;
       const canvasMouseX = (mouseX - this.panX) / this.scale;
       const canvasMouseY = (mouseY - this.panY) / this.scale;
 
       this.panX -= canvasMouseX * newScale - canvasMouseX * this.scale;
       this.panY -= canvasMouseY * newScale - canvasMouseY * this.scale;
-
       this.scale = newScale;
-
-      this.clearCanvas();
-    } else if (this.isPanning) {
-      this.clicked = false;
-
-      const mouseX = e.clientX - this.canvas.offsetLeft;
-      const mouseY = e.clientY - this.canvas.offsetTop;
-
-      const deltaX = mouseX - this.lastMouseX;
-      const deltaY = mouseY - this.lastMouseY;
-
-      this.panX += deltaX;
-      this.panY += deltaY;
-
-      this.lastMouseX = mouseX;
-      this.lastMouseY = mouseY;
-
-      this.forPanClearCanvas();
+      this.triggerBgRedraw();
+      this.triggerTopRedraw();
     }
   };
 
   initMouseHandlers() {
-    this.canvas.addEventListener("mousedown", this.mouseDownHandler);
-
-    this.canvas.addEventListener("mouseup", this.mouseUpHandler);
-
-    this.canvas.addEventListener("mousemove", this.mouseMoveHandler);
-    this.canvas.addEventListener("wheel", this.mouseWheelHandler);
+    this.topCanvas.addEventListener("mousedown", this.mouseDownHandler);
+    this.topCanvas.addEventListener("mouseup", this.mouseUpHandler);
+    this.topCanvas.addEventListener("mousemove", this.mouseMoveHandler);
+    this.topCanvas.addEventListener("wheel", this.mouseWheelHandler, { passive: false });
   }
 }
