@@ -23,7 +23,8 @@ function AuthCallbackContent() {
                     const response = await api.post("/oauth-login", {
                         email: session.user?.email,
                         name: session.user?.name,
-                        provider: (session.user as any).provider ?? "oauth"
+                        provider: (session.user as any).provider ?? "oauth",
+                        intent: intent
                     });
 
                     const { token } = response.data;
@@ -53,7 +54,7 @@ function AuthCallbackContent() {
                 <div className="flex items-center gap-3 p-5 bg-red-500/10 border border-red-500/20 rounded-2xl text-red-400 max-w-md text-sm">
                     <AlertCircle className="w-5 h-5 flex-shrink-0" />
                     <div>
-                        <p className="font-bold mb-1">Account already exists</p>
+                        <p className="font-bold mb-1">Authentication Error</p>
                         <p>{errorMsg}</p>
                     </div>
                 </div>

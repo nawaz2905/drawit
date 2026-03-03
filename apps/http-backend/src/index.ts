@@ -60,7 +60,7 @@ app.post("/signup", async (req, res) => {
 
 app.post("/oauth-login", async (req, res) => {
     try {
-        const { email, name, provider } = req.body;
+        const { email, name, provider, intent } = req.body;
 
         if (!email) {
             return res.status(400).json({
@@ -74,9 +74,25 @@ app.post("/oauth-login", async (req, res) => {
             }
         });
 
-        if (!user) {
+        if (intent === "signup" && user) {
+            return res.status(409).json({
+                message: "User already exists with this email. Please sign in instead."
+            });
+        }
+
+        if (intent === "signin" && !user) {
             return res.status(403).json({
-                message: "This email is not registered. Please sign up with an email and password first."
+                message: "No account found with this email. Please sign up first."
+            });
+        }
+
+        if (!user) {
+            user = await prisma.user.create({
+                data: {
+                    email: email,
+                    name: name || email.split('@')[0],
+                    provider: provider || "oauth"
+                }
             });
         }
 
