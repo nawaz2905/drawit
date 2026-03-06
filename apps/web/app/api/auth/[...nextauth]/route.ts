@@ -11,6 +11,11 @@ const handler = NextAuth({
     GitHubProvider({
       clientId: process.env.GITHUB_ID!,
       clientSecret: process.env.GITHUB_SECRET!,
+      authorization: {
+        params: {
+          scope: "read:user user:email",
+        },
+      },
     }),
   ],
 
@@ -23,8 +28,10 @@ const handler = NextAuth({
   },
 
   callbacks: {
-    async jwt({ token, account }) {
+    async jwt({ token, account, user }) {
       if (account) {
+        console.log("NextAuth JWT Callback - Account:", account);
+        console.log("NextAuth JWT Callback - User:", user);
         token.provider = account.provider;
       }
       return token;

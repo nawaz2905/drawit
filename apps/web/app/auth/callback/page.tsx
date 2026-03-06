@@ -19,7 +19,13 @@ function AuthCallbackContent() {
         if (status === "authenticated" && session?.user && !processed) {
             const syncUser = async () => {
                 try {
-                    console.log("OAuth session:", JSON.stringify(session.user));
+                    console.log("OAuth session user:", session.user);
+
+                    if (!session.user?.email) {
+                        setErrorMsg("GitHub/Google did not provide an email address. Please check your privacy settings.");
+                        return;
+                    }
+
                     const response = await api.post("/oauth-login", {
                         email: session.user?.email,
                         name: session.user?.name,

@@ -60,6 +60,7 @@ app.post("/signup", async (req, res) => {
 
 app.post("/oauth-login", async (req, res) => {
     try {
+        console.log("OAuth Login Request Body:", req.body);
         const { email, name, provider, intent } = req.body;
 
         if (!email) {
