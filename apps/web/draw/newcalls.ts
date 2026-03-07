@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { getExistingShapes } from "./http";
 import { Game } from "./Game";
 
-type Shape = "circle" | "rect" | "pencil" | "hand" | "eraser";
+type Shape = "circle" | "rect" | "pencil" | "hand" | "eraser" | "text" | "select";
 
 export function useGame(roomId: number, socket: WebSocket) {
   const bgCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -88,5 +88,8 @@ export function useGame(roomId: number, socket: WebSocket) {
     }
   }, [selectedTool, game]);
 
-  return { bgCanvasRef, topCanvasRef, selectedTool, setSelectedTool };
+  const undo = () => game?.undo();
+  const redo = () => game?.redo();
+
+  return { bgCanvasRef, topCanvasRef, selectedTool, setSelectedTool, undo, redo };
 }

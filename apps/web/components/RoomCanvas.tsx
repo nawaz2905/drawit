@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { Canvas } from "./Canvas";
 import { useRouter } from "next/navigation";
-import {WS_URL} from '../lib/socket'
+import { WS_URL } from '../lib/socket'
 
 export function RoomCanvas({ roomId }: { roomId: string }) {
     const [socket, setSocket] = useState<WebSocket | null>(null);

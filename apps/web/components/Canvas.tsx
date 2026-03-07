@@ -1,10 +1,10 @@
 "use client";
 import { IconButton } from "./Icons";
 import { useGame } from "../draw/newcalls";
-import { Circle, Pencil, Square, Hand, Eraser, MousePointer2, LogIn } from "lucide-react";
+import { Circle, Pencil, Square, Hand, Eraser, MousePointer2, LogIn, Undo2, Redo2, Type } from "lucide-react";
 import { motion } from "framer-motion";
 
-type Shape = "circle" | "rect" | "pencil" | "hand" | "eraser";
+type Shape = "circle" | "rect" | "pencil" | "hand" | "eraser" | "text" | "select";
 
 export function Canvas({
     roomId,
@@ -13,7 +13,7 @@ export function Canvas({
     roomId: number;
     socket: WebSocket;
 }) {
-    const { bgCanvasRef, topCanvasRef, selectedTool, setSelectedTool } = useGame(roomId, socket);
+    const { bgCanvasRef, topCanvasRef, selectedTool, setSelectedTool, undo, redo } = useGame(roomId, socket);
 
     return (
         <div className="h-screen w-screen overflow-hidden bg-zinc-50 relative" >
@@ -35,7 +35,7 @@ export function Canvas({
                 className="absolute inset-0 z-20 w-full h-full block cursor-crosshair"
             />
 
-            <TopBar setSelectedTool={setSelectedTool} selectedTool={selectedTool} />
+            <TopBar setSelectedTool={setSelectedTool} selectedTool={selectedTool} undo={undo} redo={redo} />
 
             {/* Context Info Overlay */}
             <div className="fixed bottom-6 right-6 z-20 px-4 py-2 bg-white/80 backdrop-blur-md border border-zinc-200 rounded-full shadow-lg flex items-center gap-3">
@@ -49,9 +49,13 @@ export function Canvas({
 export function TopBar({
     selectedTool,
     setSelectedTool,
+    undo,
+    redo,
 }: {
     selectedTool: Shape;
     setSelectedTool: (tool: Shape) => void;
+    undo: () => void;
+    redo: () => void;
 }) {
     return (
         <motion.div
@@ -63,6 +67,14 @@ export function TopBar({
                 <MousePointer2 className="w-4 h-4 text-blue-400" />
                 <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Tools</span>
             </div>
+
+            <IconButton
+                selectedTool={selectedTool}
+                setSelectedTool={setSelectedTool}
+                icon={<MousePointer2 className="w-5 h-5" />}
+                onClick={() => setSelectedTool("select")}
+                activated={selectedTool === "select"}
+            />
 
             <IconButton
                 selectedTool={selectedTool}
@@ -103,6 +115,36 @@ export function TopBar({
                 onClick={() => setSelectedTool("eraser")}
                 activated={selectedTool === "eraser"}
             />
+
+            <IconButton
+                selectedTool={selectedTool}
+                setSelectedTool={setSelectedTool}
+                icon={<Type className="w-5 h-5" />}
+                onClick={() => setSelectedTool("text")}
+                activated={selectedTool === "text"}
+            />
+
+            <div className="w-px h-6 bg-zinc-800 mx-1" />
+
+            <motion.button
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.9 }}
+                onClick={undo}
+                className="p-2 text-zinc-400 hover:text-white rounded-xl transition-colors"
+                title="Undo (Ctrl+Z)"
+            >
+                <Undo2 className="w-5 h-5" />
+            </motion.button>
+
+            <motion.button
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.9 }}
+                onClick={redo}
+                className="p-2 text-zinc-400 hover:text-white rounded-xl transition-colors"
+                title="Redo (Ctrl+Y)"
+            >
+                <Redo2 className="w-5 h-5" />
+            </motion.button>
 
             <div className="w-px h-6 bg-zinc-800 mx-1" />
 

@@ -1,6 +1,6 @@
 import { handleDeletion } from "./deleteShape";
 
-type Tool = "circle" | "pencil" | "rect" | "hand" | "eraser";
+type Tool = "circle" | "pencil" | "rect" | "hand" | "eraser" | "text" | "select";
 
 export type Shape =
   | {
@@ -33,6 +33,14 @@ export type Shape =
     startX: number;
     startY: number;
     BufferStroke: [number, number][];
+  }
+  | {
+    id?: number;
+    type: "text";
+    x: number;
+    y: number;
+    text: string;
+    fontSize: number;
   };
 
 export class Game {
@@ -62,6 +70,12 @@ export class Game {
   private needsTopRedraw: boolean = true;
   private animationFrameId: number | null = null;
   private activeShape: Shape | null = null;
+  private selectedShape: Shape | null = null;
+  private isDragging: boolean = false;
+  private dragStartX: number = 0;
+  private dragStartY: number = 0;
+  private undoStack: Shape[][] = [];
+  private redoStack: Shape[][] = [];
 
   private parseShape(shape: any): any | null {
     if (shape !== null && typeof shape === "object" && !Array.isArray(shape)) {
@@ -129,6 +143,41 @@ export class Game {
     this.selectedTool = tool;
   }
 
+  undo() {
+    if (this.existingShapes.length > 0) {
+      this.redoStack.push([...this.existingShapes]);
+      this.existingShapes.pop();
+      this.triggerBgRedraw();
+
+      this.socket.send(JSON.stringify({
+        type: "undo",
+        roomId: Number(this.roomId)
+      }));
+    }
+  }
+
+  redo() {
+    if (this.redoStack.length > 0) {
+      this.undoStack.push([...this.existingShapes]);
+      const nextShapes = this.redoStack.pop();
+      if (nextShapes) {
+        this.existingShapes = nextShapes;
+        this.triggerBgRedraw();
+
+        // Redo is tricky with the current backend as it usually just adds the last shape
+        // For now, let's sync the last shape added back
+        const lastShape = this.existingShapes[this.existingShapes.length - 1];
+        if (lastShape) {
+          this.socket.send(JSON.stringify({
+            type: "chat",
+            message: JSON.stringify(lastShape),
+            roomId: Number(this.roomId),
+          }));
+        }
+      }
+    }
+  }
+
   private startRenderLoop() {
     const loop = () => {
       this.render();
@@ -183,6 +232,42 @@ export class Game {
     if (this.activeShape) {
       this.drawShape(this.topCtx, this.activeShape);
     }
+
+    if (this.selectedShape) {
+      this.drawSelectionHighlight(this.topCtx, this.selectedShape);
+    }
+  }
+
+  private drawSelectionHighlight(ctx: CanvasRenderingContext2D, shape: Shape) {
+    ctx.strokeStyle = "rgba(0, 150, 255, 0.5)";
+    ctx.lineWidth = 2 / this.scale;
+    ctx.setLineDash([5, 5]);
+
+    if (shape.type === "rect") {
+      ctx.strokeRect(shape.x - 2 / this.scale, shape.y - 2 / this.scale, shape.width + 4 / this.scale, shape.height + 4 / this.scale);
+    } else if (shape.type === "circle") {
+      ctx.beginPath();
+      ctx.arc(shape.centerX, shape.centerY, Math.abs(shape.radius) + 2 / this.scale, 0, Math.PI * 2);
+      ctx.stroke();
+    } else if (shape.type === "pencil" || shape.type === "eraser") {
+      // Simplified bounding box for pencil
+      const points = shape.BufferStroke;
+      if (points.length === 0) return;
+      let minX = points[0]?.[0] ?? 0;
+      let maxX = points[0]?.[0] ?? 0;
+      let minY = points[0]?.[1] ?? 0;
+      let maxY = points[0]?.[1] ?? 0;
+      points.forEach(p => {
+        if (!p || p[0] === -1) return;
+        minX = Math.min(minX, p[0]); maxX = Math.max(maxX, p[0]);
+        minY = Math.min(minY, p[1]); maxY = Math.max(maxY, p[1]);
+      });
+      ctx.strokeRect(minX - 4, minY - 4, (maxX - minX) + 8, (maxY - minY) + 8);
+    } else if (shape.type === "text") {
+      const metrics = ctx.measureText(shape.text);
+      ctx.strokeRect(shape.x - 2, shape.y - shape.fontSize, metrics.width + 4, shape.fontSize + 4);
+    }
+    ctx.setLineDash([]);
   }
 
   private drawShape(ctx: CanvasRenderingContext2D, shape: Shape) {
@@ -220,6 +305,10 @@ export class Game {
         }
       }
       ctx.stroke();
+    } else if (shape.type === "text") {
+      ctx.fillStyle = "rgba(255, 255, 255)";
+      ctx.font = `${shape.fontSize}px Arial`;
+      ctx.fillText(shape.text, shape.x, shape.y);
     }
   }
 
@@ -254,6 +343,9 @@ export class Game {
       } else if (data.type === "delete") {
         const deleteId = data.id;
         this.existingShapes = this.existingShapes.filter(s => s.id !== deleteId);
+        this.triggerBgRedraw();
+      } else if (data.type === "undo") {
+        this.existingShapes.pop();
         this.triggerBgRedraw();
       }
     };
@@ -292,15 +384,78 @@ export class Game {
         startY: transformedY,
         BufferStroke: [...this.BufferStroke],
       };
+    } else if (this.selectedTool === "text") {
+      const text = prompt("Enter text:");
+      if (text) {
+        this.activeShape = {
+          type: "text",
+          x: transformedX,
+          y: transformedY,
+          text: text,
+          fontSize: 20 / this.scale,
+        };
+        // For text, we can commit it immediately on click since there's no drag
+        this.existingShapes.push(this.activeShape);
+        this.triggerBgRedraw();
+        this.socket.send(JSON.stringify({
+          type: "chat",
+          message: JSON.stringify(this.activeShape),
+          roomId: Number(this.roomId),
+        }));
+        this.activeShape = null;
+      }
+    } else if (this.selectedTool === "select") {
+      this.selectedShape = this.findShapeAt(transformedX, transformedY);
+      if (this.selectedShape) {
+        this.isDragging = true;
+        this.dragStartX = transformedX;
+        this.dragStartY = transformedY;
+      }
     }
     this.triggerTopRedraw();
   };
+
+  private findShapeAt(x: number, y: number): Shape | null {
+    // Search in reverse to find the top-most shape
+    for (let i = this.existingShapes.length - 1; i >= 0; i--) {
+      const shape = this.existingShapes[i];
+      if (shape && this.isPointInShape(x, y, shape)) {
+        return shape;
+      }
+    }
+    return null;
+  }
+
+  private isPointInShape(x: number, y: number, shape: Shape): boolean {
+    if (shape.type === "rect") {
+      const left = Math.min(shape.x, shape.x + shape.width);
+      const right = Math.max(shape.x, shape.x + shape.width);
+      const top = Math.min(shape.y, shape.y + shape.height);
+      const bottom = Math.max(shape.y, shape.y + shape.height);
+      return x >= left && x <= right && y >= top && y <= bottom;
+    } else if (shape.type === "circle") {
+      const dx = x - shape.centerX;
+      const dy = y - shape.centerY;
+      return Math.sqrt(dx * dx + dy * dy) <= Math.abs(shape.radius);
+    } else if (shape.type === "pencil") {
+      return shape.BufferStroke.some(p => {
+        const dx = x - p[0];
+        const dy = y - p[1];
+        return Math.sqrt(dx * dx + dy * dy) < 5 / this.scale;
+      });
+    } else if (shape.type === "text") {
+      // Approximate text hit box
+      return x >= shape.x && x <= shape.x + 100 && y >= shape.y - shape.fontSize && y <= shape.y;
+    }
+    return false;
+  }
 
   private eraseAt(transformedX: number, transformedY: number) {
     const eraserRadius = 10 / this.scale;
     let anyCollided = false;
     this.existingShapes = this.existingShapes.filter((existing) => {
       let collided = false;
+      if (!existing) return true;
       if (existing.type === "pencil") {
         collided = existing.BufferStroke.some(p => {
           const dx = p[0] - transformedX;
@@ -406,6 +561,8 @@ export class Game {
       if (shape.type === "eraser") {
         this.eraseAt(transformedX, transformedY);
       } else {
+        this.redoStack = []; // Clear redo stack on new action
+        this.undoStack.push([...this.existingShapes]);
         this.existingShapes.push(shape);
         this.triggerBgRedraw();
         this.socket.send(JSON.stringify({
@@ -415,8 +572,19 @@ export class Game {
         }));
       }
       this.activeShape = null;
-      this.triggerTopRedraw();
     }
+
+    if (this.isDragging && this.selectedShape) {
+      this.isDragging = false;
+      // Sync moved shape
+      this.socket.send(JSON.stringify({
+        type: "chat",
+        message: JSON.stringify(this.selectedShape),
+        roomId: Number(this.roomId),
+      }));
+    }
+
+    this.triggerTopRedraw();
   };
 
   mouseMoveHandler = (e: any) => {
@@ -473,11 +641,38 @@ export class Game {
               }
             }
           }
+        } else if (this.selectedTool === "select" && this.isDragging && this.selectedShape) {
+          const dx = transformedX - this.dragStartX;
+          const dy = transformedY - this.dragStartY;
+          this.moveShape(this.selectedShape, dx, dy);
+          this.dragStartX = transformedX;
+          this.dragStartY = transformedY;
+          this.triggerBgRedraw();
         }
         this.triggerTopRedraw();
       }
     }
   };
+
+  private moveShape(shape: Shape, dx: number, dy: number) {
+    if (shape.type === "rect") {
+      shape.x += dx;
+      shape.y += dy;
+    } else if (shape.type === "circle") {
+      shape.centerX += dx;
+      shape.centerY += dy;
+    } else if (shape.type === "pencil" || shape.type === "eraser") {
+      shape.startX += dx;
+      shape.startY += dy;
+      shape.BufferStroke = shape.BufferStroke.map(p => {
+        if (p[0] === -1) return p;
+        return [p[0] + dx, p[1] + dy];
+      });
+    } else if (shape.type === "text") {
+      shape.x += dx;
+      shape.y += dy;
+    }
+  }
 
   mouseWheelHandler = (e: any) => {
     if (e.ctrlKey) {
