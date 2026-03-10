@@ -76,6 +76,7 @@ export class Game {
   private dragStartY: number = 0;
   private undoStack: Shape[][] = [];
   private redoStack: Shape[][] = [];
+  private activeTextInput: HTMLInputElement | null = null;
 
   private parseShape(shape: any): any | null {
     if (shape !== null && typeof shape === "object" && !Array.isArray(shape)) {
@@ -133,6 +134,7 @@ export class Game {
     if (this.animationFrameId !== null) {
       cancelAnimationFrame(this.animationFrameId);
     }
+    this.removeActiveTextInput();
     this.topCanvas.removeEventListener("mousedown", this.mouseDownHandler);
     this.topCanvas.removeEventListener("mouseup", this.mouseUpHandler);
     this.topCanvas.removeEventListener("mousemove", this.mouseMoveHandler);
@@ -140,7 +142,17 @@ export class Game {
   }
 
   setTool(tool: Tool) {
+    if (tool !== "text") {
+      this.removeActiveTextInput();
+    }
     this.selectedTool = tool;
+  }
+
+  private removeActiveTextInput() {
+    if (this.activeTextInput?.parentNode) {
+      this.activeTextInput.parentNode.removeChild(this.activeTextInput);
+    }
+    this.activeTextInput = null;
   }
 
   undo() {
@@ -385,29 +397,41 @@ export class Game {
         BufferStroke: [...this.BufferStroke],
       };
     } else if (this.selectedTool === "text") {
+      this.clicked = false;
+      this.removeActiveTextInput();
+
       // Create an inline input element
       const input = document.createElement("input");
       input.type = "text";
-      input.style.position = "absolute";
-      // Position the input exactly where the user clicked, taking scroll into account
-      const topCanvasRect = this.topCanvas.getBoundingClientRect();
-      input.style.left = `${topCanvasRect.left + mouseX}px`;
-      input.style.top = `${topCanvasRect.top + mouseY - (20 / this.scale)}px`; // Adjust slightly up for better alignment
+      input.style.position = "fixed";
+      input.style.left = `${e.clientX}px`;
+      input.style.top = `${e.clientY - (20 / this.scale)}px`;
       input.style.fontSize = `${20 * this.scale}px`; // Scale input font size visually
       input.style.fontFamily = "Arial";
       input.style.color = "white"; // Match canvas text color
-      input.style.background = "transparent";
+      input.style.background = "rgba(0, 0, 0, 0.75)";
       input.style.border = "1px dashed rgba(255, 255, 255, 0.5)"; // Subtle border to indicate editing
+      input.style.minWidth = "24px";
       input.style.outline = "none";
-      input.style.padding = "0";
+      input.style.padding = "2px 4px";
       input.style.margin = "0";
       input.style.zIndex = "1000";
+      input.style.caretColor = "white";
 
       document.body.appendChild(input);
-      input.focus();
+      this.activeTextInput = input;
+
+      requestAnimationFrame(() => {
+        if (this.activeTextInput === input) {
+          input.focus();
+        }
+      });
 
       // Handle completion of text entry
+      let finished = false;
       const finishTextEntry = () => {
+        if (finished) return;
+        finished = true;
         if (input.value.trim() !== "") {
           const textShape: Shape = {
             type: "text",
@@ -424,11 +448,11 @@ export class Game {
             roomId: Number(this.roomId),
           }));
         }
-        // Cleanup
-        if (input.parentNode) {
-          input.parentNode.removeChild(input);
-        }
+        this.removeActiveTextInput();
       };
+
+      input.addEventListener("mousedown", (evt) => evt.stopPropagation());
+      input.addEventListener("click", (evt) => evt.stopPropagation());
 
       // Finish on Enter key or losing focus
       input.addEventListener("blur", finishTextEntry);
@@ -437,11 +461,11 @@ export class Game {
           finishTextEntry();
         } else if (evt.key === "Escape") {
           // Cancel on escape
-          if (input.parentNode) {
-            input.parentNode.removeChild(input);
-          }
+          finished = true;
+          this.removeActiveTextInput();
         }
       });
+      return;
     } else if (this.selectedTool === "select") {
       this.selectedShape = this.findShapeAt(transformedX, transformedY);
       if (this.selectedShape) {
