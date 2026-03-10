@@ -385,25 +385,63 @@ export class Game {
         BufferStroke: [...this.BufferStroke],
       };
     } else if (this.selectedTool === "text") {
-      const text = prompt("Enter text:");
-      if (text) {
-        this.activeShape = {
-          type: "text",
-          x: transformedX,
-          y: transformedY,
-          text: text,
-          fontSize: 20 / this.scale,
-        };
-        // For text, we can commit it immediately on click since there's no drag
-        this.existingShapes.push(this.activeShape);
-        this.triggerBgRedraw();
-        this.socket.send(JSON.stringify({
-          type: "chat",
-          message: JSON.stringify(this.activeShape),
-          roomId: Number(this.roomId),
-        }));
-        this.activeShape = null;
-      }
+      // Create an inline input element
+      const input = document.createElement("input");
+      input.type = "text";
+      input.style.position = "absolute";
+      // Position the input exactly where the user clicked, taking scroll into account
+      const topCanvasRect = this.topCanvas.getBoundingClientRect();
+      input.style.left = `${topCanvasRect.left + mouseX}px`;
+      input.style.top = `${topCanvasRect.top + mouseY - (20 / this.scale)}px`; // Adjust slightly up for better alignment
+      input.style.fontSize = `${20 * this.scale}px`; // Scale input font size visually
+      input.style.fontFamily = "Arial";
+      input.style.color = "white"; // Match canvas text color
+      input.style.background = "transparent";
+      input.style.border = "1px dashed rgba(255, 255, 255, 0.5)"; // Subtle border to indicate editing
+      input.style.outline = "none";
+      input.style.padding = "0";
+      input.style.margin = "0";
+      input.style.zIndex = "1000";
+
+      document.body.appendChild(input);
+      input.focus();
+
+      // Handle completion of text entry
+      const finishTextEntry = () => {
+        if (input.value.trim() !== "") {
+          const textShape: Shape = {
+            type: "text",
+            x: transformedX,
+            y: transformedY,
+            text: input.value,
+            fontSize: 20 / this.scale,
+          };
+          this.existingShapes.push(textShape);
+          this.triggerBgRedraw();
+          this.socket.send(JSON.stringify({
+            type: "chat",
+            message: JSON.stringify(textShape),
+            roomId: Number(this.roomId),
+          }));
+        }
+        // Cleanup
+        if (input.parentNode) {
+          input.parentNode.removeChild(input);
+        }
+      };
+
+      // Finish on Enter key or losing focus
+      input.addEventListener("blur", finishTextEntry);
+      input.addEventListener("keydown", (evt) => {
+        if (evt.key === "Enter") {
+          finishTextEntry();
+        } else if (evt.key === "Escape") {
+          // Cancel on escape
+          if (input.parentNode) {
+            input.parentNode.removeChild(input);
+          }
+        }
+      });
     } else if (this.selectedTool === "select") {
       this.selectedShape = this.findShapeAt(transformedX, transformedY);
       if (this.selectedShape) {
