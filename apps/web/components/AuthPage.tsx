@@ -38,14 +38,12 @@ export function AuthPage({ isSignin }: { isSignin: boolean }) {
                     password,
                     name,
                 });
-                const signinResponse = await api.post(
-                    "/signin", {
-                    email,
-                    password,
-                },
-                );
-                localStorage.setItem("token", signinResponse.data.token);
-                router.push("/signin");
+                if (!response?.data?.token) {
+                    setError("Something went wrong");
+                    return;
+                }
+                localStorage.setItem("token", response.data.token);
+                router.push("/room");
             }
         } catch (e: any) {
             setError(e.response?.data?.message || "Authentication failed. Please try again.");

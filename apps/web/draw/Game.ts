@@ -77,6 +77,16 @@ export class Game {
   private undoStack: Shape[][] = [];
   private redoStack: Shape[][] = [];
   private activeTextInput: HTMLInputElement | null = null;
+  private pendingSocketMessages: string[] = [];
+  private flushPendingMessages = () => {
+    while (this.socket.readyState === WebSocket.OPEN && this.pendingSocketMessages.length > 0) {
+      const message = this.pendingSocketMessages.shift();
+      if (!message) {
+        return;
+      }
+      this.socket.send(message);
+    }
+  };
 
   private parseShape(shape: any): any | null {
     if (shape !== null && typeof shape === "object" && !Array.isArray(shape)) {
@@ -125,6 +135,7 @@ export class Game {
 
     this.existingShapes = this.existingShapes.map((s) => this.parseShape(s)).filter((s) => s !== null);
 
+    this.socket.addEventListener("open", this.flushPendingMessages);
     this.initHandlers();
     this.initMouseHandlers();
     this.startRenderLoop();
@@ -135,10 +146,20 @@ export class Game {
       cancelAnimationFrame(this.animationFrameId);
     }
     this.removeActiveTextInput();
+    this.socket.removeEventListener("open", this.flushPendingMessages);
     this.topCanvas.removeEventListener("mousedown", this.mouseDownHandler);
     this.topCanvas.removeEventListener("mouseup", this.mouseUpHandler);
     this.topCanvas.removeEventListener("mousemove", this.mouseMoveHandler);
     this.topCanvas.removeEventListener("wheel", this.mouseWheelHandler);
+  }
+
+  private sendSocketMessage(payload: unknown) {
+    const message = JSON.stringify(payload);
+    if (this.socket.readyState === WebSocket.OPEN) {
+      this.socket.send(message);
+      return;
+    }
+    this.pendingSocketMessages.push(message);
   }
 
   setTool(tool: Tool) {
@@ -161,10 +182,10 @@ export class Game {
       this.existingShapes.pop();
       this.triggerBgRedraw();
 
-      this.socket.send(JSON.stringify({
+      this.sendSocketMessage({
         type: "undo",
         roomId: Number(this.roomId)
-      }));
+      });
     }
   }
 
@@ -180,11 +201,11 @@ export class Game {
         // For now, let's sync the last shape added back
         const lastShape = this.existingShapes[this.existingShapes.length - 1];
         if (lastShape) {
-          this.socket.send(JSON.stringify({
+          this.sendSocketMessage({
             type: "chat",
             message: JSON.stringify(lastShape),
             roomId: Number(this.roomId),
-          }));
+          });
         }
       }
     }
@@ -276,10 +297,21 @@ export class Game {
       });
       ctx.strokeRect(minX - 4, minY - 4, (maxX - minX) + 8, (maxY - minY) + 8);
     } else if (shape.type === "text") {
-      const metrics = ctx.measureText(shape.text);
-      ctx.strokeRect(shape.x - 2, shape.y - shape.fontSize, metrics.width + 4, shape.fontSize + 4);
+      const bounds = this.getTextBounds(ctx, shape);
+      ctx.strokeRect(bounds.left - 2, bounds.top - 2, (bounds.right - bounds.left) + 4, (bounds.bottom - bounds.top) + 4);
     }
     ctx.setLineDash([]);
+  }
+
+  private getTextBounds(ctx: CanvasRenderingContext2D, shape: Extract<Shape, { type: "text" }>) {
+    ctx.font = `${shape.fontSize}px Arial`;
+    const metrics = ctx.measureText(shape.text);
+    return {
+      left: shape.x,
+      right: shape.x + metrics.width,
+      top: shape.y - shape.fontSize,
+      bottom: shape.y,
+    };
   }
 
   private drawShape(ctx: CanvasRenderingContext2D, shape: Shape) {
@@ -442,11 +474,11 @@ export class Game {
           };
           this.existingShapes.push(textShape);
           this.triggerBgRedraw();
-          this.socket.send(JSON.stringify({
+          this.sendSocketMessage({
             type: "chat",
             message: JSON.stringify(textShape),
             roomId: Number(this.roomId),
-          }));
+          });
         }
         this.removeActiveTextInput();
       };
@@ -506,8 +538,8 @@ export class Game {
         return Math.sqrt(dx * dx + dy * dy) < 5 / this.scale;
       });
     } else if (shape.type === "text") {
-      // Approximate text hit box
-      return x >= shape.x && x <= shape.x + 100 && y >= shape.y - shape.fontSize && y <= shape.y;
+      const bounds = this.getTextBounds(this.bgCtx, shape);
+      return x >= bounds.left && x <= bounds.right && y >= bounds.top && y <= bounds.bottom;
     }
     return false;
   }
@@ -518,7 +550,7 @@ export class Game {
     this.existingShapes = this.existingShapes.filter((existing) => {
       let collided = false;
       if (!existing) return true;
-      if (existing.type === "pencil") {
+      if (existing.type === "pencil" || existing.type === "eraser") {
         collided = existing.BufferStroke.some(p => {
           const dx = p[0] - transformedX;
           const dy = p[1] - transformedY;
@@ -538,15 +570,21 @@ export class Game {
         const dx = existing.centerX - transformedX;
         const dy = existing.centerY - transformedY;
         collided = Math.sqrt(dx * dx + dy * dy) < Math.abs(existing.radius) + eraserRadius;
+      } else if (existing.type === "text") {
+        const bounds = this.getTextBounds(this.bgCtx, existing);
+        collided = transformedX >= bounds.left - eraserRadius &&
+          transformedX <= bounds.right + eraserRadius &&
+          transformedY >= bounds.top - eraserRadius &&
+          transformedY <= bounds.bottom + eraserRadius;
       }
 
       if (collided) {
         if (existing.id) {
-          this.socket.send(JSON.stringify({
+          this.sendSocketMessage({
             type: "delete",
             id: existing.id,
             roomId: Number(this.roomId)
-          }));
+          });
 
           let startX = 0, startY = 0, endX = 0, endY = 0;
           if (existing.type === "rect") {
@@ -560,7 +598,7 @@ export class Game {
             startY = existing.centerY - r;
             endX = existing.centerX + r;
             endY = existing.centerY + r;
-          } else if (existing.type === "pencil") {
+          } else if (existing.type === "pencil" || existing.type === "eraser") {
             startX = existing.startX; startY = existing.startY;
             const lastPoint = existing.BufferStroke[existing.BufferStroke.length - 1];
             if (lastPoint) {
@@ -570,8 +608,22 @@ export class Game {
               endX = startX;
               endY = startY;
             }
+          } else if (existing.type === "text") {
+            const bounds = this.getTextBounds(this.bgCtx, existing);
+            startX = bounds.left;
+            startY = bounds.top;
+            endX = bounds.right;
+            endY = bounds.bottom;
           }
-          handleDeletion(Number(this.roomId), existing.type, Math.floor(startX), Math.floor(startY), Math.floor(endX), Math.floor(endY));
+          handleDeletion(
+            Number(this.roomId),
+            existing.id,
+            existing.type,
+            Math.floor(startX),
+            Math.floor(startY),
+            Math.floor(endX),
+            Math.floor(endY)
+          );
         }
         anyCollided = true;
         return false;
@@ -627,11 +679,11 @@ export class Game {
         this.undoStack.push([...this.existingShapes]);
         this.existingShapes.push(shape);
         this.triggerBgRedraw();
-        this.socket.send(JSON.stringify({
+        this.sendSocketMessage({
           type: "chat",
           message: JSON.stringify(shape),
           roomId: Number(this.roomId),
-        }));
+        });
       }
       this.activeShape = null;
     }
@@ -639,11 +691,11 @@ export class Game {
     if (this.isDragging && this.selectedShape) {
       this.isDragging = false;
       // Sync moved shape
-      this.socket.send(JSON.stringify({
+      this.sendSocketMessage({
         type: "chat",
         message: JSON.stringify(this.selectedShape),
         roomId: Number(this.roomId),
-      }));
+      });
     }
 
     this.triggerTopRedraw();

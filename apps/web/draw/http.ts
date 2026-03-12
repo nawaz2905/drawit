@@ -2,17 +2,10 @@ import { api } from '../lib/api'
 
 export async function getExistingShapes(roomId: Number) {
     try {
-        const slugResponce = await api.get(
+        const roomResponse = await api.get(
             `/roomchats/${roomId}`,
         );
-        const slug = slugResponce.data.slug;
-
-        if (!slug) {
-            return [];
-        }
-        const res = await api.get(`/chats/${slug}`);
-
-        const messages: { id: number, message: string }[] = res.data.messages || [];
+        const messages: { id: number, message: string }[] = roomResponse.data.messages || [];
         const shapes: any = messages
             .map((item) => {
                 try {

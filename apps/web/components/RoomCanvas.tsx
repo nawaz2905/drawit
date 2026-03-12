@@ -6,6 +6,7 @@ import { WS_URL } from '../lib/socket'
 
 export function RoomCanvas({ roomId }: { roomId: string }) {
     const [socket, setSocket] = useState<WebSocket | null>(null);
+    const [isConnected, setIsConnected] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const router = useRouter();
 
@@ -19,9 +20,11 @@ export function RoomCanvas({ roomId }: { roomId: string }) {
             return;
         }
         const ws = new WebSocket(`${WS_URL}?token=${token}`)
+        setSocket(ws);
+        setIsConnected(false);
 
         ws.onopen = () => {
-            setSocket(ws);
+            setIsConnected(true);
             ws.send(
                 JSON.stringify({
                     type: "join_room",
@@ -30,9 +33,11 @@ export function RoomCanvas({ roomId }: { roomId: string }) {
             );
         };
         ws.onerror = (err) => {
+            setIsConnected(false);
             setError("Failed to connect to server");
         };
         ws.onclose = () => {
+            setIsConnected(false);
         }
         return () => {
             if (ws.readyState === WebSocket.OPEN) {
@@ -53,14 +58,14 @@ export function RoomCanvas({ roomId }: { roomId: string }) {
         return (
             <div className="min-h-screen bg-black flex items-center justify-center" >
                 <div className="text-white" >
-                    Connecting to server....
+                    Preparing canvas....
                 </div>
             </div>
         )
     }
     return (
         <div>
-            <Canvas roomId={Number(roomId)} socket={socket}></Canvas>
+            <Canvas roomId={Number(roomId)} socket={socket} isConnected={isConnected}></Canvas>
         </div>
     )
 }

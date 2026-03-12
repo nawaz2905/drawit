@@ -8,10 +8,12 @@ type Shape = "circle" | "rect" | "pencil" | "hand" | "eraser" | "text" | "select
 
 export function Canvas({
     roomId,
-    socket
+    socket,
+    isConnected,
 }: {
     roomId: number;
     socket: WebSocket;
+    isConnected: boolean;
 }) {
     const { bgCanvasRef, topCanvasRef, selectedTool, setSelectedTool, undo, redo } = useGame(roomId, socket);
 
@@ -39,8 +41,10 @@ export function Canvas({
 
             {/* Context Info Overlay */}
             <div className="fixed bottom-6 right-6 z-20 px-4 py-2 bg-white/80 backdrop-blur-md border border-zinc-200 rounded-full shadow-lg flex items-center gap-3">
-                <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-                <span className="text-xs font-bold text-zinc-600 tracking-wide uppercase">Room ID: {roomId}</span>
+                <div className={`w-2 h-2 rounded-full ${isConnected ? "bg-emerald-500 animate-pulse" : "bg-amber-500"}`} />
+                <span className="text-xs font-bold text-zinc-600 tracking-wide uppercase">
+                    {isConnected ? `Room ID: ${roomId}` : `Connecting room ${roomId}`}
+                </span>
             </div>
         </div>
     )
