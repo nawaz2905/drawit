@@ -1,11 +1,18 @@
 
 import {api} from '../lib/api'
 
-export async function handleDeletion(roomId: any, type: string, startX: number, startY: number, endX: number, endY: number) {
+export async function handleDeletion(
+    roomId: number,
+    shapeId: number,
+    type: string,
+    startX: number,
+    startY: number,
+    endX: number,
+    endY: number
+) {
     try {
-        const slugResponse = await api.get(`/room/id/${roomId}`);
-        const slug = slugResponse.data.slug;
-        const response = await api.post(`/deletechat/${slug}`, {
+        const response = await api.post(`/deleteshape/${roomId}`, {
+            id: shapeId,
             type: type,
             startX: startX,
             startY: startY,

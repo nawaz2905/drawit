@@ -45,8 +45,13 @@ app.post("/signup", async (req, res) => {
             }
         });
 
+        const token = jwt.sign({
+            userId: user.id
+        }, JWT_PASSCODE);
+
         return res.status(201).json({
             userId: user.id,
+            token,
             message: "signed up successfully!"
         });
 
@@ -203,10 +208,18 @@ app.get("/roomchats/:roomId", async (req, res) => {
         const room = await prisma.room.findFirst({
             where: {
                 id: roomId,
+            },
+            include: {
+                chats: true,
             }
         });
+        const messages = (room?.chats ?? []).map((chat: any) => ({
+            id: chat.id,
+            message: chat.message
+        }));
         res.json({
             slug: room?.slug,
+            messages,
         })
 
     } catch (e) {
@@ -251,6 +264,7 @@ app.post("/savemessage", (req, res) => {
 app.post("/deletechat/:slug", async (req, res) => {
     try {
         const slug = req.params.slug;
+        const id = req.body.id;
         const type = req.body.type;
         const startX = req.body.startX;
         const startY = req.body.startY;
@@ -269,16 +283,23 @@ app.post("/deletechat/:slug", async (req, res) => {
                 message: "Room not found"
             });
         }
-        const shape = await prisma.chat.findFirst({
-            where: {
-                roomId: roomId,
-                type: type,
-                startX: startX,
-                startY: startY,
-                endX: endX,
-                endY: endY
-            }
-        });
+        const shape = id
+            ? await prisma.chat.findFirst({
+                where: {
+                    id: Number(id),
+                    roomId: roomId
+                }
+            })
+            : await prisma.chat.findFirst({
+                where: {
+                    roomId: roomId,
+                    type: type,
+                    startX: startX,
+                    startY: startY,
+                    endX: endX,
+                    endY: endY
+                }
+            });
         if (!shape) {
             return res.status(404).json({
                 message: "Shape not Found"
@@ -286,7 +307,6 @@ app.post("/deletechat/:slug", async (req, res) => {
         }
         const response = await prisma.chat.delete({
             where: {
-                roomId: roomId,
                 id: shape.id
             }
         });
@@ -312,7 +332,7 @@ app.post("/deletechat/:slug", async (req, res) => {
 app.post("/deleteshape/:roomId", async (req, res) => {
     try {
         const roomId = Number(req.params.roomId);
-        const { type, startX, startY, endY, endX } = req.body;
+        const { id, type, startX, startY, endY, endX } = req.body;
 
         const room = await prisma.room.findFirst({
             where: {
@@ -324,16 +344,23 @@ app.post("/deleteshape/:roomId", async (req, res) => {
                 message: "Room not Found!"
             });
         }
-        const chat = await prisma.chat.findFirst({
-            where: {
-                roomId: roomId,
-                type: type,
-                startX: startX,
-                startY: startY,
-                endX: endX,
-                endY: endY
-            }
-        });
+        const chat = id
+            ? await prisma.chat.findFirst({
+                where: {
+                    id: Number(id),
+                    roomId: roomId
+                }
+            })
+            : await prisma.chat.findFirst({
+                where: {
+                    roomId: roomId,
+                    type: type,
+                    startX: startX,
+                    startY: startY,
+                    endX: endX,
+                    endY: endY
+                }
+            });
         if (!chat) {
             return res.status(404).json({
                 message: "Shape not Found"
