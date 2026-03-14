@@ -3,12 +3,14 @@ import { useEffect, useRef, useState } from "react";
 import { getExistingShapes } from "./http";
 import { Game } from "./Game";
 
-type Shape = "circle" | "rect" | "pencil" | "hand" | "eraser" | "text" | "select";
+type Shape = "circle" | "rect" | "pencil" | "hand" | "eraser" | "text" | "select" | "diamond";
 
 export function useGame(roomId: number, socket: WebSocket) {
   const bgCanvasRef = useRef<HTMLCanvasElement>(null);
   const topCanvasRef = useRef<HTMLCanvasElement>(null);
   const [selectedTool, setSelectedTool] = useState<Shape>("circle");
+  const [strokeColor, setStrokeColor] = useState<string>("#ffff00");
+  const [boardColor, setBoardColor] = useState<string>("#3d2b1f");
   const [game, setGame] = useState<Game | null>(null);
   const [existingShapes, setExistingShapes] = useState<any[]>([]);
   const [allShapeXRect, setAllShapeXRect] = useState<number[]>([]);
@@ -88,8 +90,31 @@ export function useGame(roomId: number, socket: WebSocket) {
     }
   }, [selectedTool, game]);
 
+  useEffect(() => {
+    if (game) {
+      game.setStrokeColor(strokeColor);
+    }
+  }, [strokeColor, game]);
+
+  useEffect(() => {
+    if (game) {
+      game.setBoardBackgroundColor(boardColor);
+    }
+  }, [boardColor, game]);
+
   const undo = () => game?.undo();
   const redo = () => game?.redo();
 
-  return { bgCanvasRef, topCanvasRef, selectedTool, setSelectedTool, undo, redo };
+  return {
+    bgCanvasRef,
+    topCanvasRef,
+    selectedTool,
+    setSelectedTool,
+    strokeColor,
+    setStrokeColor,
+    boardColor,
+    setBoardColor,
+    undo,
+    redo
+  };
 }

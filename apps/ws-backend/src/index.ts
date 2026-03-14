@@ -104,7 +104,7 @@ wss.on('connection', function connection(ws, request) {
                         endX = message.BufferStroke[message.BufferStroke.length - 1][0];
                         endY = message.BufferStroke[message.BufferStroke.length - 1][1];
                     }
-                } else if (message.type === "rect") {
+                } else if (message.type === "rect" || message.type === "diamond") {
                     startX = message.x;
                     startY = message.y;
                     endX = message.x + message.width;
@@ -114,6 +114,11 @@ wss.on('connection', function connection(ws, request) {
                     startY = message.centerY - message.radius;
                     endX = message.centerX + message.radius;
                     endY = message.centerY + message.radius;
+                } else if (message.type === "text") {
+                    startX = message.x;
+                    startY = message.y - message.fontSize;
+                    endX = message.x + (message.text.length * (message.fontSize * 0.6));
+                    endY = message.y;
                 }
 
                 const serializedMessage = JSON.stringify(message);
@@ -122,10 +127,10 @@ wss.on('connection', function connection(ws, request) {
                     data: {
                         roomId: roomId,
                         type: message.type,
-                        startX: startX ? Math.floor(startX) : null,
-                        startY: startY ? Math.floor(startY) : null,
-                        endX: endX ? Math.floor(endX) : null,
-                        endY: endY ? Math.floor(endY) : null,
+                        startX: startX !== undefined && startX !== null ? Math.floor(startX) : null,
+                        startY: startY !== undefined && startY !== null ? Math.floor(startY) : null,
+                        endX: endX !== undefined && endX !== null ? Math.floor(endX) : null,
+                        endY: endY !== undefined && endY !== null ? Math.floor(endY) : null,
                         message: serializedMessage,
                         userId: userId
                     },
