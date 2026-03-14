@@ -1,6 +1,6 @@
 import { handleDeletion } from "./deleteShape";
 
-type Tool = "circle" | "pencil" | "rect" | "hand" | "eraser" | "text" | "select";
+type Tool = "circle" | "pencil" | "rect" | "hand" | "eraser" | "text" | "select" | "diamond";
 
 export type Shape =
   | {
@@ -10,6 +10,16 @@ export type Shape =
     y: number;
     width: number;
     height: number;
+    strokeColor?: string;
+  }
+  | {
+    id?: number;
+    type: "diamond";
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    strokeColor?: string;
   }
   | {
     id?: number;
@@ -17,6 +27,7 @@ export type Shape =
     centerX: number;
     centerY: number;
     radius: number;
+    strokeColor?: string;
   }
   | {
     id?: number;
@@ -26,6 +37,7 @@ export type Shape =
     endX?: number;
     endY?: number;
     BufferStroke: [number, number][];
+    strokeColor?: string;
   }
   | {
     id?: number;
@@ -33,6 +45,7 @@ export type Shape =
     startX: number;
     startY: number;
     BufferStroke: [number, number][];
+    strokeColor?: string;
   }
   | {
     id?: number;
@@ -41,6 +54,7 @@ export type Shape =
     y: number;
     text: string;
     fontSize: number;
+    strokeColor?: string;
   };
 
 export class Game {
@@ -78,6 +92,8 @@ export class Game {
   private redoStack: Shape[][] = [];
   private activeTextInput: HTMLInputElement | null = null;
   private pendingSocketMessages: string[] = [];
+  private currentStrokeColor: string = "#ffff00";
+  private boardBackgroundColor: string = "#3d2b1f";
   private flushPendingMessages = () => {
     while (this.socket.readyState === WebSocket.OPEN && this.pendingSocketMessages.length > 0) {
       const message = this.pendingSocketMessages.shift();
@@ -139,18 +155,23 @@ export class Game {
     this.initHandlers();
     this.initMouseHandlers();
     this.startRenderLoop();
+    window.addEventListener("resize", this.handleResize);
   }
 
   destroy() {
     if (this.animationFrameId !== null) {
       cancelAnimationFrame(this.animationFrameId);
     }
+    window.removeEventListener("resize", this.handleResize);
     this.removeActiveTextInput();
     this.socket.removeEventListener("open", this.flushPendingMessages);
     this.topCanvas.removeEventListener("mousedown", this.mouseDownHandler);
     this.topCanvas.removeEventListener("mouseup", this.mouseUpHandler);
     this.topCanvas.removeEventListener("mousemove", this.mouseMoveHandler);
     this.topCanvas.removeEventListener("wheel", this.mouseWheelHandler);
+    this.topCanvas.removeEventListener("touchstart", this.touchStartHandler);
+    this.topCanvas.removeEventListener("touchmove", this.touchMoveHandler);
+    this.topCanvas.removeEventListener("touchend", this.touchEndHandler);
   }
 
   private sendSocketMessage(payload: unknown) {
@@ -167,6 +188,15 @@ export class Game {
       this.removeActiveTextInput();
     }
     this.selectedTool = tool;
+  }
+
+  setStrokeColor(color: string) {
+    this.currentStrokeColor = color;
+  }
+
+  setBoardBackgroundColor(color: string) {
+    this.boardBackgroundColor = color;
+    this.triggerBgRedraw();
   }
 
   private removeActiveTextInput() {
@@ -240,7 +270,7 @@ export class Game {
 
   private renderBackground() {
     this.bgCtx.setTransform(this.scale, 0, 0, this.scale, this.panX, this.panY);
-    this.bgCtx.fillStyle = "rgba(0, 0, 0)";
+    this.bgCtx.fillStyle = this.boardBackgroundColor;
     this.bgCtx.fillRect(
       -this.panX / this.scale,
       -this.panY / this.scale,
@@ -276,7 +306,7 @@ export class Game {
     ctx.lineWidth = 2 / this.scale;
     ctx.setLineDash([5, 5]);
 
-    if (shape.type === "rect") {
+    if (shape.type === "rect" || shape.type === "diamond") {
       ctx.strokeRect(shape.x - 2 / this.scale, shape.y - 2 / this.scale, shape.width + 4 / this.scale, shape.height + 4 / this.scale);
     } else if (shape.type === "circle") {
       ctx.beginPath();
@@ -317,11 +347,21 @@ export class Game {
   private drawShape(ctx: CanvasRenderingContext2D, shape: Shape) {
     if (!shape) return;
 
-    ctx.strokeStyle = "rgba(255, 255, 255)";
-    ctx.lineWidth = 1 / this.scale;
+    ctx.strokeStyle = shape.strokeColor || "rgba(255, 255, 255)";
+    ctx.lineWidth = 4 / this.scale;
 
     if (shape.type === "rect") {
       ctx.strokeRect(shape.x, shape.y, shape.width, shape.height);
+    } else if (shape.type === "diamond") {
+      const midX = shape.x + shape.width / 2;
+      const midY = shape.y + shape.height / 2;
+      ctx.beginPath();
+      ctx.moveTo(midX, shape.y);
+      ctx.lineTo(shape.x + shape.width, midY);
+      ctx.lineTo(midX, shape.y + shape.height);
+      ctx.lineTo(shape.x, midY);
+      ctx.closePath();
+      ctx.stroke();
     } else if (shape.type === "circle") {
       ctx.beginPath();
       ctx.arc(shape.centerX, shape.centerY, Math.abs(shape.radius), 0, Math.PI * 2);
@@ -350,7 +390,7 @@ export class Game {
       }
       ctx.stroke();
     } else if (shape.type === "text") {
-      ctx.fillStyle = "rgba(255, 255, 255)";
+      ctx.fillStyle = shape.strokeColor || "rgba(255, 255, 255)";
       ctx.font = `${shape.fontSize}px Arial`;
       ctx.fillText(shape.text, shape.x, shape.y);
     }
@@ -420,6 +460,7 @@ export class Game {
         startX: transformedX,
         startY: transformedY,
         BufferStroke: [...this.BufferStroke],
+        strokeColor: this.currentStrokeColor,
       };
     } else if (this.selectedTool === "eraser") {
       this.activeShape = {
@@ -427,6 +468,7 @@ export class Game {
         startX: transformedX,
         startY: transformedY,
         BufferStroke: [...this.BufferStroke],
+        strokeColor: this.boardBackgroundColor,
       };
     } else if (this.selectedTool === "text") {
       this.clicked = false;
@@ -440,7 +482,7 @@ export class Game {
       input.style.top = `${e.clientY - (20 / this.scale)}px`;
       input.style.fontSize = `${20 * this.scale}px`; // Scale input font size visually
       input.style.fontFamily = "Arial";
-      input.style.color = "white"; // Match canvas text color
+      input.style.color = this.currentStrokeColor; // Match selected stroke color
       input.style.background = "rgba(0, 0, 0, 0.75)";
       input.style.border = "1px dashed rgba(255, 255, 255, 0.5)"; // Subtle border to indicate editing
       input.style.minWidth = "24px";
@@ -471,6 +513,7 @@ export class Game {
             y: transformedY,
             text: input.value,
             fontSize: 20 / this.scale,
+            strokeColor: this.currentStrokeColor,
           };
           this.existingShapes.push(textShape);
           this.triggerBgRedraw();
@@ -527,6 +570,13 @@ export class Game {
       const top = Math.min(shape.y, shape.y + shape.height);
       const bottom = Math.max(shape.y, shape.y + shape.height);
       return x >= left && x <= right && y >= top && y <= bottom;
+    } else if (shape.type === "diamond") {
+      const midX = shape.x + shape.width / 2;
+      const midY = shape.y + shape.height / 2;
+      // Approximate point in rhombus using manhattan distance
+      const dx = Math.abs(x - midX) / (shape.width / 2);
+      const dy = Math.abs(y - midY) / (shape.height / 2);
+      return dx + dy <= 1;
     } else if (shape.type === "circle") {
       const dx = x - shape.centerX;
       const dy = y - shape.centerY;
@@ -566,6 +616,14 @@ export class Game {
           transformedX <= right + eraserRadius &&
           transformedY >= top - eraserRadius &&
           transformedY <= bottom + eraserRadius;
+      } else if (existing.type === "diamond") {
+        const midX = existing.x + existing.width / 2;
+        const midY = existing.y + existing.height / 2;
+        const dx = Math.abs(transformedX - midX) / (existing.width / 2);
+        const dy = Math.abs(transformedY - midY) / (existing.height / 2);
+        // Add eraser radius tolerance to diamond distance check
+        const tolerance = eraserRadius / Math.min(existing.width / 2, existing.height / 2);
+        collided = dx + dy <= 1 + tolerance;
       } else if (existing.type === "circle") {
         const dx = existing.centerX - transformedX;
         const dy = existing.centerY - transformedY;
@@ -587,7 +645,7 @@ export class Game {
           });
 
           let startX = 0, startY = 0, endX = 0, endY = 0;
-          if (existing.type === "rect") {
+          if (existing.type === "rect" || existing.type === "diamond") {
             startX = Math.min(existing.x, existing.x + existing.width);
             startY = Math.min(existing.y, existing.y + existing.height);
             endX = Math.max(existing.x, existing.x + existing.width);
@@ -645,17 +703,18 @@ export class Game {
     const transformedX = (mouseX - this.panX) / this.scale;
     const transformedY = (mouseY - this.panY) / this.scale;
 
-    if (!this.activeShape && (this.selectedTool === "rect" || this.selectedTool === "circle")) {
+    if (!this.activeShape && (this.selectedTool === "rect" || this.selectedTool === "circle" || this.selectedTool === "diamond")) {
       const startX = (this.startX - this.bgCanvas.offsetLeft - this.panX) / this.scale;
       const startY = (this.startY - this.bgCanvas.offsetTop - this.panY) / this.scale;
 
-      if (this.selectedTool === "rect") {
+      if (this.selectedTool === "rect" || this.selectedTool === "diamond") {
         this.activeShape = {
-          type: "rect",
+          type: this.selectedTool,
           x: Math.min(startX, transformedX),
           y: Math.min(startY, transformedY),
           width: Math.abs(transformedX - startX),
           height: Math.abs(transformedY - startY),
+          strokeColor: this.currentStrokeColor,
         };
       } else if (this.selectedTool === "circle") {
         const width = transformedX - startX;
@@ -666,6 +725,7 @@ export class Game {
           radius: radius,
           centerX: startX + width / 2,
           centerY: startY + height / 2,
+          strokeColor: this.currentStrokeColor,
         };
       }
     }
@@ -725,13 +785,14 @@ export class Game {
           this.eraseAt(transformedX, transformedY);
         }
 
-        if (this.selectedTool === "rect") {
+        if (this.selectedTool === "rect" || this.selectedTool === "diamond") {
           this.activeShape = {
-            type: "rect",
+            type: this.selectedTool,
             x: Math.min(startX, transformedX),
             y: Math.min(startY, transformedY),
             width: Math.abs(transformedX - startX),
             height: Math.abs(transformedY - startY),
+            strokeColor: this.currentStrokeColor,
           };
         } else if (this.selectedTool === "circle") {
           const width = transformedX - startX;
@@ -742,6 +803,7 @@ export class Game {
             radius: radius,
             centerX: startX + width / 2,
             centerY: startY + height / 2,
+            strokeColor: this.currentStrokeColor,
           };
         } else if (this.selectedTool === "pencil" || this.selectedTool === "eraser") {
           const lastPoint = this.BufferStroke[this.BufferStroke.length - 1];
@@ -769,7 +831,7 @@ export class Game {
   };
 
   private moveShape(shape: Shape, dx: number, dy: number) {
-    if (shape.type === "rect") {
+    if (shape.type === "rect" || shape.type === "diamond") {
       shape.x += dx;
       shape.y += dy;
     } else if (shape.type === "circle") {
@@ -789,21 +851,65 @@ export class Game {
   }
 
   mouseWheelHandler = (e: any) => {
-    if (e.ctrlKey) {
-      e.preventDefault();
-      const scaleAmount = -e.deltaY / 500;
-      const newScale = Math.max(0.1, Math.min(this.scale * (1 + scaleAmount), 20));
-      const mouseX = e.clientX - this.topCanvas.offsetLeft;
-      const mouseY = e.clientY - this.topCanvas.offsetTop;
-      const canvasMouseX = (mouseX - this.panX) / this.scale;
-      const canvasMouseY = (mouseY - this.panY) / this.scale;
+    e.preventDefault();
+    const scaleAmount = -e.deltaY * 0.001;
+    const newScale = Math.min(Math.max(0.1, this.scale + scaleAmount), 5);
 
-      this.panX -= canvasMouseX * newScale - canvasMouseX * this.scale;
-      this.panY -= canvasMouseY * newScale - canvasMouseY * this.scale;
-      this.scale = newScale;
-      this.triggerBgRedraw();
-      this.triggerTopRedraw();
+    const mouseX = e.clientX - this.topCanvas.offsetLeft;
+    const mouseY = e.clientY - this.topCanvas.offsetTop;
+
+    const fullX = (mouseX - this.panX) / this.scale;
+    const fullY = (mouseY - this.panY) / this.scale;
+
+    this.panX = mouseX - fullX * newScale;
+    this.panY = mouseY - fullY * newScale;
+    this.scale = newScale;
+
+    this.triggerBgRedraw();
+    this.triggerTopRedraw();
+  };
+
+  touchStartHandler = (e: TouchEvent) => {
+    e.preventDefault();
+    if (e.touches.length === 1) {
+      const touch = e.touches[0]!;
+      const mouseEvent = new MouseEvent("mousedown", {
+        clientX: touch.clientX,
+        clientY: touch.clientY,
+      });
+      this.mouseDownHandler(mouseEvent);
     }
+  };
+
+  touchMoveHandler = (e: TouchEvent) => {
+    e.preventDefault();
+    if (e.touches.length === 1) {
+      const touch = e.touches[0]!;
+      const mouseEvent = new MouseEvent("mousemove", {
+        clientX: touch.clientX,
+        clientY: touch.clientY,
+      });
+      this.mouseMoveHandler(mouseEvent);
+    }
+  };
+
+  touchEndHandler = (e: TouchEvent) => {
+    e.preventDefault();
+    const mouseEvent = new MouseEvent("mouseup", {});
+    this.mouseUpHandler(mouseEvent);
+  };
+
+  handleResize = () => {
+    const width = document.body?.clientWidth || 800;
+    const height = document.body?.clientHeight || 600;
+
+    this.bgCanvas.width = width;
+    this.bgCanvas.height = height;
+    this.topCanvas.width = width;
+    this.topCanvas.height = height;
+
+    this.triggerBgRedraw();
+    this.triggerTopRedraw();
   };
 
   initMouseHandlers() {
@@ -811,5 +917,8 @@ export class Game {
     this.topCanvas.addEventListener("mouseup", this.mouseUpHandler);
     this.topCanvas.addEventListener("mousemove", this.mouseMoveHandler);
     this.topCanvas.addEventListener("wheel", this.mouseWheelHandler, { passive: false });
+    this.topCanvas.addEventListener("touchstart", this.touchStartHandler, { passive: false });
+    this.topCanvas.addEventListener("touchmove", this.touchMoveHandler, { passive: false });
+    this.topCanvas.addEventListener("touchend", this.touchEndHandler, { passive: false });
   }
 }
