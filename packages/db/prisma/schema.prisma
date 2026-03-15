@@ -53,6 +53,7 @@ model Chat {
   startY   Int?
   endY     Int?
   type     String?
-  
+
+  @@index([roomId])
 }
 

@@ -123,7 +123,21 @@ wss.on('connection', function connection(ws, request) {
 
                 const serializedMessage = JSON.stringify(message);
 
-                const response = await prisma.chat.create({
+                // Broadcast immediately to reduce latency for other users
+                const broadcastPayload = JSON.stringify({
+                    type: "chat",
+                    message: serializedMessage,
+                    roomId,
+                });
+
+                users.forEach((user) => {
+                    if (user.rooms.includes(roomId)) {
+                        user.ws.send(broadcastPayload);
+                    }
+                });
+
+                // Save to database in the background
+                prisma.chat.create({
                     data: {
                         roomId: roomId,
                         type: message.type,
@@ -134,20 +148,9 @@ wss.on('connection', function connection(ws, request) {
                         message: serializedMessage,
                         userId: userId
                     },
+                }).catch(err => {
+                    console.error("Background DB write failed:", err);
                 });
-
-                users.forEach((user) => {
-                    if (user.rooms.includes(roomId)) {
-                        user.ws.send(
-                            JSON.stringify({
-                                type: "chat",
-                                id: response.id,
-                                message: serializedMessage,
-                                roomId,
-                            })
-                        )
-                    }
-                })
 
             } catch (e) {
                 console.log("error in sending to users or something, error is " + e);
@@ -162,6 +165,20 @@ wss.on('connection', function connection(ws, request) {
                     user.ws.send(JSON.stringify({
                         type: "delete",
                         id,
+                        roomId
+                    }));
+                }
+            });
+        }
+
+        if (parsedData.type === "delete_by_props") {
+            const roomId = parsedData.roomId;
+            const shape = parsedData.shape;
+            users.forEach((user) => {
+                if (user.rooms.includes(roomId)) {
+                    user.ws.send(JSON.stringify({
+                        type: "delete_by_props",
+                        shape,
                         roomId
                     }));
                 }
