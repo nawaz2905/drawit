@@ -268,19 +268,42 @@ export class Game {
     }
   }
 
+  private offscreenCanvas: HTMLCanvasElement | null = null;
+  private offscreenCtx: CanvasRenderingContext2D | null = null;
+
+  private initOffscreenCanvas() {
+    this.offscreenCanvas = document.createElement("canvas");
+    this.offscreenCanvas.width = this.bgCanvas.width;
+    this.offscreenCanvas.height = this.bgCanvas.height;
+    this.offscreenCtx = this.offscreenCanvas.getContext("2d")!;
+  }
+
   private renderBackground() {
-    this.bgCtx.setTransform(this.scale, 0, 0, this.scale, this.panX, this.panY);
-    this.bgCtx.fillStyle = this.boardBackgroundColor;
-    this.bgCtx.fillRect(
+    if (!this.offscreenCanvas) {
+      this.initOffscreenCanvas();
+    }
+
+    const { offscreenCanvas, offscreenCtx } = this;
+    if (!offscreenCanvas || !offscreenCtx) return;
+
+    // Redraw offscreen cache if needed
+    offscreenCtx.setTransform(this.scale, 0, 0, this.scale, this.panX, this.panY);
+    offscreenCtx.fillStyle = this.boardBackgroundColor;
+    offscreenCtx.fillRect(
       -this.panX / this.scale,
       -this.panY / this.scale,
-      this.bgCanvas.width / this.scale,
-      this.bgCanvas.height / this.scale,
+      offscreenCanvas.width / this.scale,
+      offscreenCanvas.height / this.scale,
     );
 
     this.existingShapes.forEach((shape) => {
-      this.drawShape(this.bgCtx, shape);
+      this.drawShape(offscreenCtx, shape);
     });
+
+    // Draw the cached background to the main canvas
+    this.bgCtx.setTransform(1, 0, 0, 1, 0, 0);
+    this.bgCtx.clearRect(0, 0, this.bgCanvas.width, this.bgCanvas.height);
+    this.bgCtx.drawImage(offscreenCanvas, 0, 0);
   }
 
   private renderTop() {
@@ -427,6 +450,13 @@ export class Game {
       } else if (data.type === "delete") {
         const deleteId = data.id;
         this.existingShapes = this.existingShapes.filter(s => s.id !== deleteId);
+        this.triggerBgRedraw();
+      } else if (data.type === "delete_by_props") {
+        const shapeToMatch = data.shape;
+        this.existingShapes = this.existingShapes.filter(s => {
+          if (s.id) return true; // Don't delete by props if it has an ID
+          return JSON.stringify(s) !== JSON.stringify(shapeToMatch);
+        });
         this.triggerBgRedraw();
       } else if (data.type === "undo") {
         this.existingShapes.pop();
@@ -643,36 +673,47 @@ export class Game {
             id: existing.id,
             roomId: Number(this.roomId)
           });
+        } else {
+          // If no ID, we broadcast a delete by properties (best effort for real-time)
+          this.sendSocketMessage({
+            type: "delete_by_props",
+            shape: existing,
+            roomId: Number(this.roomId)
+          });
+        }
 
-          let startX = 0, startY = 0, endX = 0, endY = 0;
-          if (existing.type === "rect" || existing.type === "diamond") {
-            startX = Math.min(existing.x, existing.x + existing.width);
-            startY = Math.min(existing.y, existing.y + existing.height);
-            endX = Math.max(existing.x, existing.x + existing.width);
-            endY = Math.max(existing.y, existing.y + existing.height);
-          } else if (existing.type === "circle") {
-            const r = Math.abs(existing.radius);
-            startX = existing.centerX - r;
-            startY = existing.centerY - r;
-            endX = existing.centerX + r;
-            endY = existing.centerY + r;
-          } else if (existing.type === "pencil" || existing.type === "eraser") {
-            startX = existing.startX; startY = existing.startY;
-            const lastPoint = existing.BufferStroke[existing.BufferStroke.length - 1];
-            if (lastPoint) {
-              endX = lastPoint[0];
-              endY = lastPoint[1];
-            } else {
-              endX = startX;
-              endY = startY;
-            }
-          } else if (existing.type === "text") {
-            const bounds = this.getTextBounds(this.bgCtx, existing);
-            startX = bounds.left;
-            startY = bounds.top;
-            endX = bounds.right;
-            endY = bounds.bottom;
+        let startX = 0, startY = 0, endX = 0, endY = 0;
+        // ... (rest of the coordinate logic remains same)
+        if (existing.type === "rect" || existing.type === "diamond") {
+          startX = Math.min(existing.x, existing.x + existing.width);
+          startY = Math.min(existing.y, existing.y + existing.height);
+          endX = Math.max(existing.x, existing.x + existing.width);
+          endY = Math.max(existing.y, existing.y + existing.height);
+        } else if (existing.type === "circle") {
+          const r = Math.abs(existing.radius);
+          startX = existing.centerX - r;
+          startY = existing.centerY - r;
+          endX = existing.centerX + r;
+          endY = existing.centerY + r;
+        } else if (existing.type === "pencil" || existing.type === "eraser") {
+          startX = existing.startX; startY = existing.startY;
+          const lastPoint = existing.BufferStroke[existing.BufferStroke.length - 1];
+          if (lastPoint) {
+            endX = lastPoint[0];
+            endY = lastPoint[1];
+          } else {
+            endX = startX;
+            endY = startY;
           }
+        } else if (existing.type === "text") {
+          const bounds = this.getTextBounds(this.bgCtx, existing);
+          startX = bounds.left;
+          startY = bounds.top;
+          endX = bounds.right;
+          endY = bounds.bottom;
+        }
+
+        if (existing.id) {
           handleDeletion(
             Number(this.roomId),
             existing.id,
