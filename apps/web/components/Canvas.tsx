@@ -1,274 +1,361 @@
 "use client";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { IconButton } from "./Icons";
 import { useGame } from "../draw/newcalls";
-import { Circle, Pencil, Square, Hand, Eraser, MousePointer2, LogIn, Undo2, Redo2, Type, Menu } from "lucide-react";
-import { motion } from "framer-motion";
+import {
+  Circle,
+  Pencil,
+  Square,
+  Hand,
+  Eraser,
+  MousePointer2,
+  LogIn,
+  Undo2,
+  Redo2,
+  Type,
+  Palette,
+  Minus,
+  AlignJustify,
+} from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 
 type Shape = "circle" | "rect" | "pencil" | "hand" | "eraser" | "text" | "select" | "diamond";
 
 export function Canvas({
-    roomId,
-    socket,
-    isConnected,
+  roomId,
+  socket,
+  isConnected,
 }: {
-    roomId: number;
-    socket: WebSocket;
-    isConnected: boolean;
+  roomId: number;
+  socket: WebSocket;
+  isConnected: boolean;
 }) {
-    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-    const { 
-        bgCanvasRef, 
-        topCanvasRef, 
-        selectedTool, 
-        setSelectedTool, 
-        strokeColor,
-        setStrokeColor,
-        boardColor,
-        setBoardColor,
-        undo, 
-        redo 
-    } = useGame(roomId, socket);
-
-    return (
-        <div className="h-screen w-screen overflow-hidden bg-zinc-50 relative" >
-            {/* Canvas Grid Background */}
-            <div className="absolute inset-0 z-0 pointer-events-none opacity-40"
-                style={{
-                    backgroundImage: `linear-gradient(#e5e7eb 1px, transparent 1px), linear-gradient(90deg, #e5e7eb 1px, transparent 1px)`,
-                    backgroundSize: '20px 20px'
-                }}
-            />
-
-            <canvas
-                ref={bgCanvasRef}
-                className="absolute inset-0 z-10 w-full h-full block"
-            />
-
-            <canvas
-                ref={topCanvasRef}
-                className="absolute inset-0 z-20 w-full h-full block cursor-crosshair"
-            />
-
-            <TopBar setSelectedTool={setSelectedTool} selectedTool={selectedTool} undo={undo} redo={redo} />
-
-            {/* Color Palette Toggle */}
-            <button
-                onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-                className="fixed left-6 top-6 z-30 p-2.5 bg-zinc-900/90 backdrop-blur-xl border border-zinc-800 rounded-xl shadow-lg text-zinc-400 hover:text-white transition-colors"
-                title="Toggle Color Palette"
-            >
-                <Menu className="w-5 h-5" />
-            </button>
-            
-            <Sidebar 
-                isOpen={isSidebarOpen}
-                strokeColor={strokeColor} 
-                setStrokeColor={setStrokeColor} 
-                boardColor={boardColor} 
-                setBoardColor={setBoardColor} 
-            />
-
-            {/* Context Info Overlay */}
-            <div className="fixed bottom-6 right-6 z-20 px-4 py-2 bg-white/80 backdrop-blur-md border border-zinc-200 rounded-full shadow-lg flex items-center gap-3">
-                <div className={`w-2 h-2 rounded-full ${isConnected ? "bg-emerald-500 animate-pulse" : "bg-amber-500"}`} />
-                <span className="text-xs font-bold text-zinc-600 tracking-wide uppercase">
-                    {isConnected ? `Room ID: ${roomId}` : `Connecting room ${roomId}`}
-                </span>
-            </div>
-        </div>
-    )
-}
-
-function Sidebar({
-    isOpen,
+  const {
+    bgCanvasRef,
+    topCanvasRef,
+    selectedTool,
+    setSelectedTool,
     strokeColor,
     setStrokeColor,
     boardColor,
     setBoardColor,
-}: {
-    isOpen: boolean;
-    strokeColor: string;
-    setStrokeColor: (color: string) => void;
-    boardColor: string;
-    setBoardColor: (color: string) => void;
-}) {
-    const boardColors = [
-        { name: "Navy Blue", value: "#0a0a2c" },
-        { name: "White", value: "#ffffff" },
-        { name: "Black", value: "#000000" },
-        { name: "Dark Brown", value: "#3d2b1f" },
-    ];
-
-    const strokeColors = [
-        { name: "Black", value: "#000000" },
-        { name: "Brown", value: "#8b4513" },
-        { name: "Blue", value: "#0000ff" },
-        { name: "Yellow", value: "#ffff00" },
-    ];
-
-    return (
-        <motion.div
-            initial={{ x: -200, opacity: 0 }}
-            animate={{ x: isOpen ? 0 : -200, opacity: isOpen ? 1 : 0 }}
-            transition={{ type: "spring", stiffness: 300, damping: 30 }}
-            className="fixed left-6 top-1/2 -translate-y-1/2 z-20 p-4 bg-zinc-900/90 backdrop-blur-xl border border-zinc-800 rounded-2xl shadow-2xl flex flex-col gap-6"
-        >
-            <div>
-                <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-3 block">Board Color</span>
-                <div className="grid grid-cols-2 gap-2">
-                    {boardColors.map((color) => (
-                        <button
-                            key={color.value}
-                            onClick={() => setBoardColor(color.value)}
-                            className={`w-8 h-8 rounded-lg border-2 transition-all ${boardColor === color.value ? "border-blue-500 scale-110 shadow-[0_0_10px_rgba(59,130,246,0.5)]" : "border-zinc-700 hover:border-zinc-500"}`}
-                            style={{ backgroundColor: color.value }}
-                            title={color.name}
-                        />
-                    ))}
-                </div>
-            </div>
-
-            <div className="w-full h-px bg-zinc-800" />
-
-            <div>
-                <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-3 block">Stroke Color</span>
-                <div className="grid grid-cols-2 gap-2">
-                    {strokeColors.map((color) => (
-                        <button
-                            key={color.value}
-                            onClick={() => setStrokeColor(color.value)}
-                            className={`w-8 h-8 rounded-lg border-2 transition-all ${strokeColor === color.value ? "border-blue-500 scale-110 shadow-[0_0_10px_rgba(59,130,246,0.5)]" : "border-zinc-700 hover:border-zinc-500"}`}
-                            style={{ backgroundColor: color.value }}
-                            title={color.name}
-                        />
-                    ))}
-                </div>
-            </div>
-        </motion.div>
-    );
-}
-
-export function TopBar({
-    selectedTool,
-    setSelectedTool,
+    lineWidth,
+    setLineWidth,
     undo,
     redo,
+  } = useGame(roomId, socket);
+
+  return (
+    <div className="h-screen w-screen overflow-hidden bg-zinc-50 relative">
+      {/* Canvas Grid Background */}
+      <div
+        className="absolute inset-0 z-0 pointer-events-none opacity-40"
+        style={{
+          backgroundImage: `linear-gradient(#e5e7eb 1px, transparent 1px), linear-gradient(90deg, #e5e7eb 1px, transparent 1px)`,
+          backgroundSize: "24px 24px",
+        }}
+      />
+
+      <canvas ref={bgCanvasRef} className="absolute inset-0 z-10 w-full h-full block" />
+      <canvas ref={topCanvasRef} className="absolute inset-0 z-20 w-full h-full block cursor-crosshair" />
+
+      <TopBar
+        setSelectedTool={setSelectedTool}
+        selectedTool={selectedTool}
+        undo={undo}
+        redo={redo}
+      />
+
+      {/* Palette toggle button */}
+      <motion.button
+        whileHover={{ scale: 1.05 }}
+        whileTap={{ scale: 0.95 }}
+        onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+        className={`fixed left-5 top-6 z-30 w-10 h-10 flex items-center justify-center rounded-xl border shadow-lg transition-all ${
+          isSidebarOpen
+            ? "bg-zinc-800 border-zinc-700 text-white"
+            : "bg-zinc-900/90 backdrop-blur-xl border-zinc-800 text-zinc-400 hover:text-white"
+        }`}
+        title="Toggle Color Palette"
+      >
+        <Palette className="w-5 h-5" />
+      </motion.button>
+
+      <Sidebar
+        isOpen={isSidebarOpen}
+        strokeColor={strokeColor}
+        setStrokeColor={setStrokeColor}
+        boardColor={boardColor}
+        setBoardColor={setBoardColor}
+        lineWidth={lineWidth}
+        setLineWidth={setLineWidth}
+      />
+
+      {/* Connection indicator */}
+      <div className="fixed bottom-5 right-5 z-20 px-4 py-2 bg-white/80 backdrop-blur-md border border-zinc-200 rounded-full shadow-lg flex items-center gap-2">
+        <div
+          className={`w-2 h-2 rounded-full flex-shrink-0 ${
+            isConnected ? "bg-emerald-500 animate-pulse" : "bg-amber-400"
+          }`}
+        />
+        <span className="text-[11px] font-bold text-zinc-600 tracking-wide uppercase">
+          {isConnected ? `Room ${roomId}` : "Connecting…"}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+/* ── Sidebar ── */
+function Sidebar({
+  isOpen,
+  strokeColor,
+  setStrokeColor,
+  boardColor,
+  setBoardColor,
+  lineWidth,
+  setLineWidth,
 }: {
-    selectedTool: Shape;
-    setSelectedTool: (tool: Shape) => void;
-    undo: () => void;
-    redo: () => void;
+  isOpen: boolean;
+  strokeColor: string;
+  setStrokeColor: (c: string) => void;
+  boardColor: string;
+  setBoardColor: (c: string) => void;
+  lineWidth: number;
+  setLineWidth: (w: number) => void;
 }) {
-    return (
+  const customStrokeRef = useRef<HTMLInputElement>(null);
+  const customBoardRef = useRef<HTMLInputElement>(null);
+
+  const boardColors = [
+    { name: "Dark Canvas", value: "#0a0a0f" },
+    { name: "Navy", value: "#0a0a2c" },
+    { name: "Dark Brown", value: "#3d2b1f" },
+    { name: "Forest", value: "#0a1f0a" },
+    { name: "White", value: "#ffffff" },
+    { name: "Parchment", value: "#fdf6e3" },
+    { name: "Slate", value: "#1e293b" },
+    { name: "Black", value: "#000000" },
+  ];
+
+  const strokeColors = [
+    { name: "White", value: "#ffffff" },
+    { name: "Yellow", value: "#facc15" },
+    { name: "Sky Blue", value: "#38bdf8" },
+    { name: "Blue", value: "#3b82f6" },
+    { name: "Purple", value: "#a855f7" },
+    { name: "Pink", value: "#ec4899" },
+    { name: "Red", value: "#ef4444" },
+    { name: "Orange", value: "#f97316" },
+    { name: "Green", value: "#22c55e" },
+    { name: "Cyan", value: "#06b6d4" },
+    { name: "Black", value: "#000000" },
+    { name: "Gray", value: "#6b7280" },
+  ];
+
+  const widths = [
+    { label: "Thin", icon: <Minus className="w-4 h-4" />, value: 2 },
+    { label: "Mid", icon: <AlignJustify className="w-4 h-4" />, value: 4 },
+    { label: "Thick", icon: <AlignJustify className="w-5 h-5 scale-y-150" />, value: 8 },
+  ];
+
+  return (
+    <AnimatePresence>
+      {isOpen && (
         <motion.div
-            initial={{ y: -20, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            className="fixed top-6 left-1/2 -translate-x-1/2 z-20 p-1.5 bg-zinc-900/90 backdrop-blur-xl border border-zinc-800 rounded-2xl shadow-2xl flex items-center gap-1.5"
+          key="sidebar"
+          initial={{ x: -240, opacity: 0 }}
+          animate={{ x: 0, opacity: 1 }}
+          exit={{ x: -240, opacity: 0 }}
+          transition={{ type: "spring", stiffness: 350, damping: 35 }}
+          className="fixed left-5 top-20 z-20 w-44 p-3 bg-zinc-900/95 backdrop-blur-xl border border-zinc-800 rounded-2xl shadow-2xl flex flex-col gap-3"
         >
-            <div className="px-3 py-1.5 mr-1 border-r border-zinc-800 hidden sm:flex items-center gap-2">
-                <MousePointer2 className="w-4 h-4 text-blue-400" />
-                <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Tools</span>
+          {/* Board Color */}
+          <div>
+            <p className="text-[9px] font-black uppercase tracking-widest text-zinc-500 mb-2">Board</p>
+            <div className="grid grid-cols-4 gap-1">
+              {boardColors.map((c) => (
+                <button
+                  key={c.value}
+                  onClick={() => setBoardColor(c.value)}
+                  title={c.name}
+                  className={`w-7 h-7 rounded-md border-2 transition-all duration-150 ${
+                    boardColor === c.value
+                      ? "border-blue-500 scale-110 shadow-[0_0_6px_rgba(59,130,246,0.5)]"
+                      : "border-zinc-700 hover:border-zinc-500 hover:scale-105"
+                  }`}
+                  style={{ backgroundColor: c.value }}
+                />
+              ))}
+              {/* Custom board color */}
+              <button
+                onClick={() => customBoardRef.current?.click()}
+                title="Custom color"
+                className="w-7 h-7 rounded-md border-2 border-dashed border-zinc-600 hover:border-zinc-400 flex items-center justify-center text-zinc-500 hover:text-zinc-300 transition-all hover:scale-105"
+              >
+                <span className="text-sm leading-none">+</span>
+                <input
+                  ref={customBoardRef}
+                  type="color"
+                  className="sr-only"
+                  value={boardColor}
+                  onChange={(e) => setBoardColor(e.target.value)}
+                />
+              </button>
             </div>
+          </div>
 
-            <IconButton
-                selectedTool={selectedTool}
-                setSelectedTool={setSelectedTool}
-                icon={<MousePointer2 className="w-5 h-5" />}
-                onClick={() => setSelectedTool("select")}
-                activated={selectedTool === "select"}
-            />
+          <div className="w-full h-px bg-zinc-800" />
 
-            <IconButton
-                selectedTool={selectedTool}
-                setSelectedTool={setSelectedTool}
-                icon={<Square className="w-5 h-5" />}
-                onClick={() => setSelectedTool("rect")}
-                activated={selectedTool === "rect"}
-            />
+          {/* Stroke Color */}
+          <div>
+            <p className="text-[9px] font-black uppercase tracking-widest text-zinc-500 mb-2">Stroke</p>
+            <div className="grid grid-cols-4 gap-1">
+              {strokeColors.map((c) => (
+                <button
+                  key={c.value}
+                  onClick={() => setStrokeColor(c.value)}
+                  title={c.name}
+                  className={`w-7 h-7 rounded-md border-2 transition-all duration-150 ${
+                    strokeColor === c.value
+                      ? "border-blue-500 scale-110 shadow-[0_0_6px_rgba(59,130,246,0.5)]"
+                      : "border-zinc-700 hover:border-zinc-500 hover:scale-105"
+                  }`}
+                  style={{ backgroundColor: c.value }}
+                />
+              ))}
+              {/* Custom stroke color */}
+              <button
+                onClick={() => customStrokeRef.current?.click()}
+                title="Custom color"
+                className="w-7 h-7 rounded-md border-2 border-dashed border-zinc-600 hover:border-zinc-400 flex items-center justify-center text-zinc-500 hover:text-zinc-300 transition-all hover:scale-105"
+              >
+                <span className="text-sm leading-none">+</span>
+                <input
+                  ref={customStrokeRef}
+                  type="color"
+                  className="sr-only"
+                  value={strokeColor}
+                  onChange={(e) => setStrokeColor(e.target.value)}
+                />
+              </button>
+            </div>
+          </div>
 
-            <IconButton
-                selectedTool={selectedTool}
-                setSelectedTool={setSelectedTool}
-                icon={<Square className="w-5 h-5 rotate-45" />}
-                onClick={() => setSelectedTool("diamond")}
-                activated={selectedTool === "diamond"}
-            />
+          <div className="w-full h-px bg-zinc-800" />
 
-            <IconButton
-                selectedTool={selectedTool}
-                setSelectedTool={setSelectedTool}
-                icon={<Circle className="w-5 h-5" />}
-                onClick={() => setSelectedTool("circle")}
-                activated={selectedTool === "circle"}
-            />
-
-            <IconButton
-                selectedTool={selectedTool}
-                setSelectedTool={setSelectedTool}
-                icon={<Pencil className="w-5 h-5" />}
-                onClick={() => setSelectedTool("pencil")}
-                activated={selectedTool === "pencil"}
-            />
-
-            <IconButton
-                selectedTool={selectedTool}
-                setSelectedTool={setSelectedTool}
-                icon={<Hand className="w-5 h-5" />}
-                onClick={() => setSelectedTool("hand")}
-                activated={selectedTool === "hand"}
-            />
-
-            <IconButton
-                selectedTool={selectedTool}
-                setSelectedTool={setSelectedTool}
-                icon={<Eraser className="w-5 h-5" />}
-                onClick={() => setSelectedTool("eraser")}
-                activated={selectedTool === "eraser"}
-            />
-
-            <IconButton
-                selectedTool={selectedTool}
-                setSelectedTool={setSelectedTool}
-                icon={<Type className="w-5 h-5" />}
-                onClick={() => setSelectedTool("text")}
-                activated={selectedTool === "text"}
-            />
-
-            <div className="w-px h-6 bg-zinc-800 mx-1" />
-
-            <motion.button
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.9 }}
-                onClick={undo}
-                className="p-2 text-zinc-400 hover:text-white rounded-xl transition-colors"
-                title="Undo (Ctrl+Z)"
-            >
-                <Undo2 className="w-5 h-5" />
-            </motion.button>
-
-            <motion.button
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.9 }}
-                onClick={redo}
-                className="p-2 text-zinc-400 hover:text-white rounded-xl transition-colors"
-                title="Redo (Ctrl+Y)"
-            >
-                <Redo2 className="w-5 h-5" />
-            </motion.button>
-
-            <div className="w-px h-6 bg-zinc-800 mx-1" />
-
-            <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => window.location.href = "/room"}
-                className="flex items-center gap-2 px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-xl transition-all text-[10px] font-black uppercase tracking-widest border border-red-500/20"
-            >
-                <LogIn className="w-4 h-4 rotate-180" />
-                Leave
-            </motion.button>
+          {/* Stroke Width */}
+          <div>
+            <p className="text-[9px] font-black uppercase tracking-widest text-zinc-500 mb-2">Width</p>
+            <div className="flex gap-1.5">
+              {widths.map((w) => (
+                <button
+                  key={w.value}
+                  onClick={() => setLineWidth(w.value)}
+                  title={w.label}
+                  className={`flex-1 py-1.5 flex flex-col items-center gap-0.5 rounded-lg border text-[9px] font-bold uppercase transition-all ${
+                    lineWidth === w.value
+                      ? "bg-blue-600/20 border-blue-500 text-blue-400"
+                      : "border-zinc-800 text-zinc-500 hover:border-zinc-600 hover:text-zinc-300"
+                  }`}
+                >
+                  {w.icon}
+                  {w.label}
+                </button>
+              ))}
+            </div>
+          </div>
         </motion.div>
-    )
+      )}
+    </AnimatePresence>
+  );
+}
+
+/* ── TopBar ── */
+export function TopBar({
+  selectedTool,
+  setSelectedTool,
+  undo,
+  redo,
+}: {
+  selectedTool: Shape;
+  setSelectedTool: (tool: Shape) => void;
+  undo: () => void;
+  redo: () => void;
+}) {
+  const tools: { icon: React.ReactNode; tool: Shape; title: string }[] = [
+    { icon: <MousePointer2 className="w-4 h-4" />, tool: "select", title: "Select" },
+    { icon: <Square className="w-4 h-4" />, tool: "rect", title: "Rectangle" },
+    { icon: <Square className="w-4 h-4 rotate-45" />, tool: "diamond", title: "Diamond" },
+    { icon: <Circle className="w-4 h-4" />, tool: "circle", title: "Circle" },
+    { icon: <Pencil className="w-4 h-4" />, tool: "pencil", title: "Pencil" },
+    { icon: <Hand className="w-4 h-4" />, tool: "hand", title: "Pan" },
+    { icon: <Eraser className="w-4 h-4" />, tool: "eraser", title: "Eraser" },
+    { icon: <Type className="w-4 h-4" />, tool: "text", title: "Text" },
+  ];
+
+  return (
+    <motion.div
+      initial={{ y: -20, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+      className="fixed top-5 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1 p-1.5 bg-zinc-900/95 backdrop-blur-xl border border-zinc-800 rounded-2xl shadow-2xl"
+    >
+      {/* Label */}
+      <div className="hidden sm:flex items-center gap-1.5 px-2 mr-0.5 border-r border-zinc-800 pr-3">
+        <MousePointer2 className="w-3.5 h-3.5 text-blue-400" />
+        <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Tools</span>
+      </div>
+
+      {/* Tool buttons */}
+      {tools.map(({ icon, tool, title }) => (
+        <IconButton
+          key={tool}
+          icon={icon}
+          onClick={() => setSelectedTool(tool)}
+          activated={selectedTool === tool}
+          selectedTool={selectedTool}
+          setSelectedTool={setSelectedTool}
+          title={title}
+        />
+      ))}
+
+      <div className="w-px h-5 bg-zinc-800 mx-1" />
+
+      {/* Undo / Redo */}
+      <motion.button
+        whileHover={{ scale: 1.1 }}
+        whileTap={{ scale: 0.9 }}
+        onClick={undo}
+        className="p-2 text-zinc-400 hover:text-white rounded-xl transition-colors"
+        title="Undo (Ctrl+Z)"
+      >
+        <Undo2 className="w-4 h-4" />
+      </motion.button>
+      <motion.button
+        whileHover={{ scale: 1.1 }}
+        whileTap={{ scale: 0.9 }}
+        onClick={redo}
+        className="p-2 text-zinc-400 hover:text-white rounded-xl transition-colors"
+        title="Redo (Ctrl+Y)"
+      >
+        <Redo2 className="w-4 h-4" />
+      </motion.button>
+
+      <div className="w-px h-5 bg-zinc-800 mx-1" />
+
+      {/* Leave */}
+      <motion.button
+        whileHover={{ scale: 1.05 }}
+        whileTap={{ scale: 0.95 }}
+        onClick={() => (window.location.href = "/room")}
+        className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-xl transition-all text-[10px] font-black uppercase tracking-widest border border-red-500/20"
+        title="Leave room"
+      >
+        <LogIn className="w-3.5 h-3.5 rotate-180" />
+        Leave
+      </motion.button>
+    </motion.div>
+  );
 }

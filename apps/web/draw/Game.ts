@@ -94,6 +94,7 @@ export class Game {
   private pendingSocketMessages: string[] = [];
   private currentStrokeColor: string = "#ffff00";
   private boardBackgroundColor: string = "#3d2b1f";
+  private currentLineWidth: number = 4;
   private flushPendingMessages = () => {
     while (this.socket.readyState === WebSocket.OPEN && this.pendingSocketMessages.length > 0) {
       const message = this.pendingSocketMessages.shift();
@@ -192,6 +193,10 @@ export class Game {
 
   setStrokeColor(color: string) {
     this.currentStrokeColor = color;
+  }
+
+  setLineWidth(width: number) {
+    this.currentLineWidth = width;
   }
 
   setBoardBackgroundColor(color: string) {
@@ -371,7 +376,7 @@ export class Game {
     if (!shape) return;
 
     ctx.strokeStyle = shape.strokeColor || "rgba(255, 255, 255)";
-    ctx.lineWidth = 4 / this.scale;
+    ctx.lineWidth = this.currentLineWidth / this.scale;
 
     if (shape.type === "rect") {
       ctx.strokeRect(shape.x, shape.y, shape.width, shape.height);

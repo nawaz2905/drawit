@@ -11,6 +11,7 @@ export function useGame(roomId: number, socket: WebSocket) {
   const [selectedTool, setSelectedTool] = useState<Shape>("circle");
   const [strokeColor, setStrokeColor] = useState<string>("#ffff00");
   const [boardColor, setBoardColor] = useState<string>("#3d2b1f");
+  const [lineWidth, setLineWidth] = useState<number>(4);
   const [game, setGame] = useState<Game | null>(null);
   const [existingShapes, setExistingShapes] = useState<any[]>([]);
   const [allShapeXRect, setAllShapeXRect] = useState<number[]>([]);
@@ -98,6 +99,12 @@ export function useGame(roomId: number, socket: WebSocket) {
 
   useEffect(() => {
     if (game) {
+      game.setLineWidth(lineWidth);
+    }
+  }, [lineWidth, game]);
+
+  useEffect(() => {
+    if (game) {
       game.setBoardBackgroundColor(boardColor);
     }
   }, [boardColor, game]);
@@ -114,7 +121,9 @@ export function useGame(roomId: number, socket: WebSocket) {
     setStrokeColor,
     boardColor,
     setBoardColor,
+    lineWidth,
+    setLineWidth,
     undo,
-    redo
+    redo,
   };
 }
