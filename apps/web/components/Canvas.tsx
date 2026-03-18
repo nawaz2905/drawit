@@ -48,16 +48,7 @@ export function Canvas({
   } = useGame(roomId, socket);
 
   return (
-    <div className="h-screen w-screen overflow-hidden bg-zinc-50 relative">
-      {/* Canvas Grid Background */}
-      <div
-        className="absolute inset-0 z-0 pointer-events-none opacity-40"
-        style={{
-          backgroundImage: `linear-gradient(#e5e7eb 1px, transparent 1px), linear-gradient(90deg, #e5e7eb 1px, transparent 1px)`,
-          backgroundSize: "24px 24px",
-        }}
-      />
-
+    <div className="h-[100dvh] w-screen overflow-hidden bg-zinc-50 relative">
       <canvas ref={bgCanvasRef} className="absolute inset-0 z-10 w-full h-full block" />
       <canvas ref={topCanvasRef} className="absolute inset-0 z-20 w-full h-full block cursor-crosshair" />
 

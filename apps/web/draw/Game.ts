@@ -303,6 +303,8 @@ export class Game {
       offscreenCanvas.height / this.scale,
     );
 
+    this.renderGrid(offscreenCtx);
+
     this.existingShapes.forEach((shape) => {
       this.drawShape(offscreenCtx, shape);
     });
@@ -361,6 +363,37 @@ export class Game {
       ctx.strokeRect(bounds.left - 2, bounds.top - 2, (bounds.right - bounds.left) + 4, (bounds.bottom - bounds.top) + 4);
     }
     ctx.setLineDash([]);
+  }
+
+  private renderGrid(ctx: CanvasRenderingContext2D) {
+    const gridSize = 24;
+    const { width, height } = this.bgCanvas;
+
+    ctx.save();
+    ctx.strokeStyle = "#e5e7eb";
+    ctx.lineWidth = 1 / this.scale;
+    ctx.globalAlpha = 0.4;
+
+    // Calculate visible range
+    const left = -this.panX / this.scale;
+    const top = -this.panY / this.scale;
+    const right = (width - this.panX) / this.scale;
+    const bottom = (height - this.panY) / this.scale;
+
+    const startX = Math.floor(left / gridSize) * gridSize;
+    const startY = Math.floor(top / gridSize) * gridSize;
+
+    ctx.beginPath();
+    for (let x = startX; x <= right; x += gridSize) {
+      ctx.moveTo(x, top);
+      ctx.lineTo(x, bottom);
+    }
+    for (let y = startY; y <= bottom; y += gridSize) {
+      ctx.moveTo(left, y);
+      ctx.lineTo(right, y);
+    }
+    ctx.stroke();
+    ctx.restore();
   }
 
   private getTextBounds(ctx: CanvasRenderingContext2D, shape: Extract<Shape, { type: "text" }>) {
@@ -979,13 +1012,18 @@ export class Game {
   };
 
   handleResize = () => {
-    const width = document.body?.clientWidth || 800;
-    const height = document.body?.clientHeight || 600;
+    const width = window.innerWidth;
+    const height = window.innerHeight;
 
     this.bgCanvas.width = width;
     this.bgCanvas.height = height;
     this.topCanvas.width = width;
     this.topCanvas.height = height;
+
+    if (this.offscreenCanvas) {
+      this.offscreenCanvas.width = width;
+      this.offscreenCanvas.height = height;
+    }
 
     this.triggerBgRedraw();
     this.triggerTopRedraw();
