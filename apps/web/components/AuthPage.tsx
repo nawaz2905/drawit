@@ -53,7 +53,7 @@ export function AuthPage({ isSignin }: { isSignin: boolean }) {
     }
 
     return (
-        <div className="min-h-screen bg-black text-white selection:bg-blue-500/30 flex items-center justify-center p-4 relative overflow-hidden">
+        <div className="min-h-screen bg-black text-white selection:bg-blue-500/30 flex items-center justify-center p-4 sm:p-6 relative overflow-hidden">
             {/* Background elements */}
             <div className="fixed inset-0 z-0 opacity-10"
                 style={{
@@ -85,7 +85,7 @@ export function AuthPage({ isSignin }: { isSignin: boolean }) {
                     </p>
                 </div>
 
-                <div className="bg-zinc-900/40 backdrop-blur-2xl border border-zinc-800 rounded-[2.5rem] p-8 shadow-2xl">
+                <div className="bg-zinc-900/40 backdrop-blur-2xl border border-zinc-800 rounded-[2.5rem] p-6 sm:p-8 shadow-2xl">
                     <AnimatePresence mode="wait">
                         {!isSuccess ? (
                             <motion.div

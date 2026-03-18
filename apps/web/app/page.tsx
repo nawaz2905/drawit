@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Paintbrush,
   Users,
@@ -15,10 +15,14 @@ import {
   Wifi,
   Monitor,
   Heart,
+  Menu,
+  X,
 } from "lucide-react";
+import { useState } from "react";
 
 export default function Home() {
   const router = useRouter();
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const features = [
     {
@@ -100,13 +104,15 @@ export default function Home() {
 
       <main className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Navigation */}
-        <nav className="flex items-center justify-between py-7">
+        <nav className="flex items-center justify-between py-7 relative z-50">
           <div className="flex items-center gap-2.5">
             <div className="w-9 h-9 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/20">
               <Paintbrush className="w-5 h-5 text-white" />
             </div>
             <span className="text-lg font-black tracking-tight">DrawIt</span>
           </div>
+
+          {/* Desktop Nav */}
           <div className="hidden md:flex items-center gap-8 text-sm font-medium">
             <a href="#features" className="text-zinc-400 hover:text-white transition-colors">
               Features
@@ -124,6 +130,56 @@ export default function Home() {
               Sign Up
             </a>
           </div>
+
+          {/* Mobile Menu Toggle */}
+          <button
+            className="md:hidden p-2 text-zinc-400 hover:text-white transition-colors"
+            onClick={() => setIsMenuOpen(!isMenuOpen)}
+          >
+            {isMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+          </button>
+
+          {/* Mobile Nav Overlay */}
+          <AnimatePresence>
+            {isMenuOpen && (
+              <motion.div
+                initial={{ opacity: 0, y: -20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                className="absolute top-full left-0 right-0 mt-2 p-6 bg-zinc-900/90 backdrop-blur-2xl border border-zinc-800 rounded-2xl md:hidden flex flex-col gap-4 shadow-2xl z-50"
+              >
+                <a
+                  href="#features"
+                  className="text-lg font-bold text-zinc-300 hover:text-white transition-colors"
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  Features
+                </a>
+                <a
+                  href="#how"
+                  className="text-lg font-bold text-zinc-300 hover:text-white transition-colors"
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  How it works
+                </a>
+                <div className="h-px bg-zinc-800 my-2" />
+                <a
+                  href="/signin"
+                  className="text-lg font-bold text-zinc-300 hover:text-white transition-colors"
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  Sign In
+                </a>
+                <a
+                  href="/signup"
+                  className="w-full py-4 bg-white text-black text-center font-black rounded-xl hover:bg-zinc-100 transition-colors"
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  Start Drawing Free
+                </a>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </nav>
 
         {/* ── Hero Section ── */}

@@ -95,6 +95,8 @@ export class Game {
   private currentStrokeColor: string = "#ffff00";
   private boardBackgroundColor: string = "#3d2b1f";
   private currentLineWidth: number = 4;
+  private initialPinchDistance: number | null = null;
+  private initialPinchScale: number = 1;
   private flushPendingMessages = () => {
     while (this.socket.readyState === WebSocket.OPEN && this.pendingSocketMessages.length > 0) {
       const message = this.pendingSocketMessages.shift();
@@ -924,8 +926,17 @@ export class Game {
         clientY: touch.clientY,
       });
       this.mouseDownHandler(mouseEvent);
+    } else if (e.touches.length === 2) {
+      this.initialPinchDistance = this.getTouchDistance(e.touches);
+      this.initialPinchScale = this.scale;
     }
   };
+
+  private getTouchDistance(touches: TouchList): number {
+    const dx = touches[0]!.clientX - touches[1]!.clientX;
+    const dy = touches[0]!.clientY - touches[1]!.clientY;
+    return Math.sqrt(dx * dx + dy * dy);
+  }
 
   touchMoveHandler = (e: TouchEvent) => {
     e.preventDefault();
@@ -936,11 +947,33 @@ export class Game {
         clientY: touch.clientY,
       });
       this.mouseMoveHandler(mouseEvent);
+    } else if (e.touches.length === 2 && this.initialPinchDistance !== null) {
+      const currentDistance = this.getTouchDistance(e.touches);
+      const pinchScale = currentDistance / this.initialPinchDistance;
+      const newScale = Math.min(Math.max(0.1, this.initialPinchScale * pinchScale), 5);
+
+      // Zoom towards center of the two fingers
+      const centerX = (e.touches[0]!.clientX + e.touches[1]!.clientX) / 2;
+      const centerY = (e.touches[0]!.clientY + e.touches[1]!.clientY) / 2;
+
+      const mouseX = centerX - this.topCanvas.offsetLeft;
+      const mouseY = centerY - this.topCanvas.offsetTop;
+
+      const fullX = (mouseX - this.panX) / this.scale;
+      const fullY = (mouseY - this.panY) / this.scale;
+
+      this.panX = mouseX - fullX * newScale;
+      this.panY = mouseY - fullY * newScale;
+      this.scale = newScale;
+
+      this.triggerBgRedraw();
+      this.triggerTopRedraw();
     }
   };
 
   touchEndHandler = (e: TouchEvent) => {
     e.preventDefault();
+    this.initialPinchDistance = null;
     const mouseEvent = new MouseEvent("mouseup", {});
     this.mouseUpHandler(mouseEvent);
   };

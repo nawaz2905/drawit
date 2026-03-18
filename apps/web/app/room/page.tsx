@@ -86,16 +86,17 @@ function Room() {
             <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-blue-600/10 blur-[120px] rounded-full z-0" />
 
             {/* Logout Button */}
-            <div className="absolute top-8 right-8 z-20">
+            <div className="absolute top-4 right-4 sm:top-8 sm:right-8 z-20">
                 <button
                     onClick={() => {
                         localStorage.removeItem("token");
                         router.push("/signin");
                     }}
-                    className="flex items-center gap-2 px-4 py-2 bg-zinc-900/50 backdrop-blur-md border border-zinc-800 rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-all text-sm font-medium"
+                    className="flex items-center gap-2 px-3 py-1.5 sm:px-4 sm:py-2 bg-zinc-900/50 backdrop-blur-md border border-zinc-800 rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-all text-xs sm:text-sm font-medium"
                 >
                     <LogIn className="w-4 h-4 rotate-180" />
-                    Log Out
+                    <span className="hidden xs:inline">Log Out</span>
+                    <span className="xs:hidden">Out</span>
                 </button>
             </div>
 

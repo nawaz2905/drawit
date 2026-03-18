@@ -94,14 +94,15 @@ export function Canvas({
       />
 
       {/* Connection indicator */}
-      <div className="fixed bottom-5 right-5 z-20 px-4 py-2 bg-white/80 backdrop-blur-md border border-zinc-200 rounded-full shadow-lg flex items-center gap-2">
+      <div className="fixed bottom-4 right-4 z-20 px-3 py-1.5 sm:px-4 sm:py-2 bg-white/80 backdrop-blur-md border border-zinc-200 rounded-full shadow-lg flex items-center gap-2">
         <div
           className={`w-2 h-2 rounded-full flex-shrink-0 ${
             isConnected ? "bg-emerald-500 animate-pulse" : "bg-amber-400"
           }`}
         />
-        <span className="text-[11px] font-bold text-zinc-600 tracking-wide uppercase">
-          {isConnected ? `Room ${roomId}` : "Connecting…"}
+        <span className="text-[10px] sm:text-[11px] font-bold text-zinc-600 tracking-wide uppercase">
+          <span className="hidden xs:inline">{isConnected ? `Room ${roomId}` : "Connecting…"}</span>
+          <span className="xs:hidden">{isConnected ? roomId : "…"}</span>
         </span>
       </div>
     </div>
@@ -170,7 +171,7 @@ function Sidebar({
           animate={{ x: 0, opacity: 1 }}
           exit={{ x: -240, opacity: 0 }}
           transition={{ type: "spring", stiffness: 350, damping: 35 }}
-          className="fixed left-5 top-20 z-20 w-44 p-3 bg-zinc-900/95 backdrop-blur-xl border border-zinc-800 rounded-2xl shadow-2xl flex flex-col gap-3"
+          className="fixed left-4 sm:left-5 top-20 z-20 w-[calc(100vw-2rem)] sm:w-44 p-3 bg-zinc-900/95 backdrop-blur-xl border border-zinc-800 rounded-2xl shadow-2xl flex flex-col gap-3"
         >
           {/* Board Color */}
           <div>
@@ -300,7 +301,7 @@ export function TopBar({
     <motion.div
       initial={{ y: -20, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
-      className="fixed top-5 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1 p-1.5 bg-zinc-900/95 backdrop-blur-xl border border-zinc-800 rounded-2xl shadow-2xl"
+      className="fixed top-4 sm:top-5 left-4 right-4 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 z-20 flex items-center gap-1 p-1 sm:p-1.5 bg-zinc-900/95 backdrop-blur-xl border border-zinc-800 rounded-xl sm:rounded-2xl shadow-2xl overflow-x-auto no-scrollbar"
     >
       {/* Label */}
       <div className="hidden sm:flex items-center gap-1.5 px-2 mr-0.5 border-r border-zinc-800 pr-3">
@@ -308,53 +309,56 @@ export function TopBar({
         <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Tools</span>
       </div>
 
-      {/* Tool buttons */}
-      {tools.map(({ icon, tool, title }) => (
-        <IconButton
-          key={tool}
-          icon={icon}
-          onClick={() => setSelectedTool(tool)}
-          activated={selectedTool === tool}
-          selectedTool={selectedTool}
-          setSelectedTool={setSelectedTool}
-          title={title}
-        />
-      ))}
+      <div className="flex-shrink-0 flex items-center gap-1">
+        {tools.map(({ icon, tool, title }) => (
+          <IconButton
+            key={tool}
+            icon={icon}
+            onClick={() => setSelectedTool(tool)}
+            activated={selectedTool === tool}
+            selectedTool={selectedTool}
+            setSelectedTool={setSelectedTool}
+            title={title}
+          />
+        ))}
+      </div>
 
-      <div className="w-px h-5 bg-zinc-800 mx-1" />
+      <div className="w-px h-5 bg-zinc-800 mx-1 flex-shrink-0" />
 
       {/* Undo / Redo */}
-      <motion.button
-        whileHover={{ scale: 1.1 }}
-        whileTap={{ scale: 0.9 }}
-        onClick={undo}
-        className="p-2 text-zinc-400 hover:text-white rounded-xl transition-colors"
-        title="Undo (Ctrl+Z)"
-      >
-        <Undo2 className="w-4 h-4" />
-      </motion.button>
-      <motion.button
-        whileHover={{ scale: 1.1 }}
-        whileTap={{ scale: 0.9 }}
-        onClick={redo}
-        className="p-2 text-zinc-400 hover:text-white rounded-xl transition-colors"
-        title="Redo (Ctrl+Y)"
-      >
-        <Redo2 className="w-4 h-4" />
-      </motion.button>
+      <div className="flex-shrink-0 flex items-center">
+        <motion.button
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.9 }}
+          onClick={undo}
+          className="p-1.5 sm:p-2 text-zinc-400 hover:text-white rounded-xl transition-colors"
+          title="Undo (Ctrl+Z)"
+        >
+          <Undo2 className="w-4 h-4" />
+        </motion.button>
+        <motion.button
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.9 }}
+          onClick={redo}
+          className="p-1.5 sm:p-2 text-zinc-400 hover:text-white rounded-xl transition-colors"
+          title="Redo (Ctrl+Y)"
+        >
+          <Redo2 className="w-4 h-4" />
+        </motion.button>
+      </div>
 
-      <div className="w-px h-5 bg-zinc-800 mx-1" />
+      <div className="w-px h-5 bg-zinc-800 mx-1 flex-shrink-0" />
 
       {/* Leave */}
       <motion.button
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
         onClick={() => (window.location.href = "/room")}
-        className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-xl transition-all text-[10px] font-black uppercase tracking-widest border border-red-500/20"
+        className="flex-shrink-0 flex items-center gap-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg sm:rounded-xl transition-all text-[9px] sm:text-[10px] font-black uppercase tracking-widest border border-red-500/20"
         title="Leave room"
       >
-        <LogIn className="w-3.5 h-3.5 rotate-180" />
-        Leave
+        <LogIn className="w-3 h-3 sm:w-3.5 sm:h-3.5 rotate-180" />
+        <span className="hidden xs:inline">Leave</span>
       </motion.button>
     </motion.div>
   );
